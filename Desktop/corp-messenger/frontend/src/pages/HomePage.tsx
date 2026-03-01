@@ -66,7 +66,7 @@ const HomePage: React.FC = () => {
   return (
     <div style={{ 
       minHeight: '100vh',
-      backgroundColor: '#ecf0f1',
+      backgroundColor: 'var(--bg-secondary)',
       padding: '20px'
     }}>
       <div style={{
@@ -78,7 +78,7 @@ const HomePage: React.FC = () => {
         {/* Основной контент - Новости */}
         <div style={{ flex: 1 }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--bg-primary)',
             borderRadius: '10px',
             padding: '30px',
             boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
@@ -86,7 +86,7 @@ const HomePage: React.FC = () => {
           }}>
             <h1 style={{ 
               marginBottom: '30px', 
-              color: '#2c3e50',
+              color: 'var(--text-primary)',
               display: 'flex',
               alignItems: 'center',
               gap: '10px'
@@ -96,13 +96,13 @@ const HomePage: React.FC = () => {
 
             {/* Форма добавления новости */}
             <div style={{
-              backgroundColor: '#f8f9fa',
+              backgroundColor: 'var(--bg-secondary)',
               padding: '20px',
               borderRadius: '8px',
               marginBottom: '30px',
-              border: '1px solid #e9ecef'
+              border: '1px solid var(--border-color)'
             }}>
-              <h3 style={{ marginBottom: '15px', color: '#495057' }}>Добавить новость</h3>
+              <h3 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Добавить новость</h3>
               <form onSubmit={handleAddNews}>
                 <input
                   type="text"
@@ -112,7 +112,7 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '90%',
                     padding: '12px',
-                    border: '1px solid #ddd',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '5px',
                     fontSize: '16px',
                     marginBottom: '10px'
@@ -125,7 +125,7 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '90%',
                     padding: '12px',
-                    border: '1px solid #ddd',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '5px',
                     fontSize: '16px',
                     marginBottom: '10px',
@@ -159,7 +159,7 @@ const HomePage: React.FC = () => {
                     border: item.isImportant ? '2px solid #e74c3c' : '1px solid #e0e0e0',
                     borderRadius: '8px',
                     padding: '20px',
-                    backgroundColor: 'white',
+                    backgroundColor: 'var(--bg-primary)',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                     borderLeft: item.isImportant ? '4px solid #e74c3c' : '4px solid #3498db'
                   }}
@@ -172,7 +172,7 @@ const HomePage: React.FC = () => {
                   }}>
                     <h3 style={{ 
                       margin: 0, 
-                      color: '#2c3e50',
+                      color: 'var(--text-primary)',
                       fontSize: '18px'
                     }}>
                       {item.title}
@@ -190,8 +190,8 @@ const HomePage: React.FC = () => {
                       )}
                     </h3>
                     <span style={{
-                      backgroundColor: '#ecf0f1',
-                      color: '#7f8c8d',
+                      backgroundColor: 'var(--bg-secondary)',
+                      color: 'var(--text-secondary)',
                       padding: '4px 8px',
                       borderRadius: '3px',
                       fontSize: '12px',
@@ -202,7 +202,7 @@ const HomePage: React.FC = () => {
                   </div>
                   
                   <p style={{ 
-                    color: '#34495e', 
+                    color: 'var(--text-primary)', 
                     lineHeight: '1.6',
                     marginBottom: '15px'
                   }}>
@@ -214,8 +214,8 @@ const HomePage: React.FC = () => {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     fontSize: '12px',
-                    color: '#7f8c8d',
-                    borderTop: '1px solid #ecf0f1',
+                    color: 'var(--text-secondary)',
+                    borderTop: '1px solid var(--border-color)',
                     paddingTop: '10px'
                   }}>
                     <span>👤 {item.author}</span>
@@ -231,7 +231,7 @@ const HomePage: React.FC = () => {
         <div style={{ width: '300px' }}>
           {/* Блок уведомлений */}
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--bg-primary)',
             borderRadius: '10px',
             padding: '20px',
             boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
@@ -239,18 +239,18 @@ const HomePage: React.FC = () => {
           }}>
             <h3 style={{ 
               marginBottom: '15px', 
-              color: '#2c3e50',
+              color: 'var(--text-primary)',
               display: 'flex',
               alignItems: 'center',
               gap: '8px'
             }}>
               🔔 Уведомления
             </h3>
-            <div style={{ fontSize: '14px', color: '#7f8c8d' }}>
-              <div style={{ padding: '8px 0', borderBottom: '1px solid #ecf0f1' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+              <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
                 Новое сообщение в чате
               </div>
-              <div style={{ padding: '8px 0', borderBottom: '1px solid #ecf0f1' }}>
+              <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
                 Завтра собрание отдела
               </div>
               <div style={{ padding: '8px 0' }}>
@@ -261,7 +261,7 @@ const HomePage: React.FC = () => {
 
           {/* Блок календаря */}
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--bg-primary)',
             borderRadius: '10px',
             padding: '20px',
             boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
@@ -269,7 +269,7 @@ const HomePage: React.FC = () => {
           }}>
             <h3 style={{ 
               marginBottom: '15px', 
-              color: '#2c3e50',
+              color: 'var(--text-primary)',
               display: 'flex',
               alignItems: 'center',
               gap: '8px'

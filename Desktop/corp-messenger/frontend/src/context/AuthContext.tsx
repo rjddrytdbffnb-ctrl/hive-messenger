@@ -1,5 +1,6 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { authAPI } from '../services/api';
 
 export interface User {
   id: string;
@@ -44,30 +45,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
 
-interface AuthProviderProps {
-  children: ReactNode;
+// Маппинг: бэкенд возвращает snake_case → фронтенд ожидает camelCase
+function mapUser(raw: any): User {
+  return {
+    id:         raw.id,
+    username:   raw.username,
+    email:      raw.email,
+    firstName:  raw.first_name  ?? raw.firstName  ?? '',
+    lastName:   raw.last_name   ?? raw.lastName   ?? '',
+    department: raw.department  ?? 'Other',
+    avatar:     raw.avatar,
+    isOnline:   raw.is_online   ?? raw.isOnline   ?? false,
+  };
 }
 
-const mockUsers: User[] = [
-  {
-    id: '1',
-    username: 'admin',
-    email: 'kalugin3d602016@mail.ru',
-    firstName: 'Андрей',
-    lastName: 'Калугин',
-    department: 'IT',
-    isOnline: true
-  }
-];
+const DEMO_TOKEN = 'demo-token';
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser]       = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,14 +76,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAuth = async () => {
     try {
       const token = localStorage.getItem('token');
-      const userData = localStorage.getItem('user');
-      
-      if (token && userData) {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
+      if (!token) return;
+
+      // Демо-режим — не идём на сервер
+      if (token === DEMO_TOKEN) {
+        const saved = localStorage.getItem('user');
+        if (saved) setUser(JSON.parse(saved));
+        return;
       }
-    } catch (error) {
-      console.error('Ошибка проверки авторизации:', error);
+
+      // Запрашиваем актуальные данные с сервера
+      const response = await authAPI.getProfile();
+      const rawUser = response.data.user ?? response.data;
+      setUser(mapUser(rawUser));
+    } catch {
+      // Токен недействителен — чистим
       localStorage.removeItem('token');
       localStorage.removeItem('user');
     } finally {
@@ -93,85 +99,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const login = async (email: string, password: string) => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      if (password === 'password') {
-        let user = mockUsers.find(u => u.email === email);
-        
-        if (!user) {
-          user = {
-            id: (mockUsers.length + 1).toString(),
-            username: email.split('@')[0],
-            email: email,
-            firstName: 'Новый',
-            lastName: 'Пользователь',
-            department: 'Other',
-            isOnline: true
-          };
-          mockUsers.push(user);
-        }
-        
-        const token = 'mock-jwt-token-' + Date.now();
-        
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        setUser(user);
-        
-        return { success: true };
-      } else {
-        return { 
-          success: false, 
-          error: 'Неверный пароль. Используйте "password" для демо-входа' 
-        };
-      }
-    } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.message || 'Ошибка входа' 
+    // Демо-режим: любой email + пароль 'password'
+    if (password === 'password') {
+      const demoUser: User = {
+        id: '1',
+        username: 'demo',
+        email: email,
+        firstName: 'Демо',
+        lastName: 'Пользователь',
+        department: 'IT',
+        isOnline: true,
       };
+      localStorage.setItem('token', DEMO_TOKEN);
+      localStorage.setItem('user', JSON.stringify(demoUser));
+      setUser(demoUser);
+      return { success: true };
+    }
+
+    try {
+      const response = await authAPI.login({ email, password });
+      const { token, user: rawUser } = response.data;
+
+      localStorage.setItem('token', token);
+      const mappedUser = mapUser(rawUser);
+      setUser(mappedUser);
+
+      return { success: true };
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        'Ошибка входа. Проверьте email и пароль.';
+      return { success: false, error: message };
     }
   };
 
   const register = async (userData: RegisterData) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const existingUser = mockUsers.find(
-        u => u.email === userData.email || u.username === userData.username
-      );
-      
-      if (existingUser) {
-        return { 
-          success: false, 
-          error: 'Пользователь с таким email или именем уже существует' 
-        };
-      }
-      
-      const newUser: User = {
-        id: (mockUsers.length + 1).toString(),
-        username: userData.username,
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        department: userData.department,
-        isOnline: true
-      };
-      
-      mockUsers.push(newUser);
-      
-      const token = 'mock-jwt-token-' + Date.now();
-      
+      const response = await authAPI.register({
+        ...userData,
+        // @ts-ignore — передаём дополнительные поля для бэкенда
+        first_name: userData.firstName,
+        last_name:  userData.lastName,
+      });
+      const { token, user: rawUser } = response.data;
+
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(newUser));
-      setUser(newUser);
-      
+      const mappedUser = mapUser(rawUser);
+      setUser(mappedUser);
+
       return { success: true };
     } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.message || 'Ошибка регистрации' 
-      };
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        'Ошибка регистрации.';
+      return { success: false, error: message };
     }
   };
 
@@ -181,17 +164,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
   };
 
-  const value: AuthContextType = {
-    user,
-    isAuthenticated: !!user,
-    login,
-    register,
-    logout,
-    loading,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated: !!user,
+      login,
+      register,
+      logout,
+      loading,
+    }}>
       {children}
     </AuthContext.Provider>
   );

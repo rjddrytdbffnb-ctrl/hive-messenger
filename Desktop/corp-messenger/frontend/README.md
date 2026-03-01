@@ -1,46 +1,229 @@
-# Getting Started with Create React App
+# 🐝 Hive Messenger - Корпоративный мессенджер
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Современный корпоративный мессенджер с интегрированной системой управления задачами.
 
-## Available Scripts
+## ✨ Новые возможности
 
-In the project directory, you can run:
+### 🎨 Темная тема
+- Переключение между светлой и темной темой
+- Автоматическое сохранение предпочтений
+- Плавные переходы между темами
+- CSS-переменные для легкой кастомизации
 
-### `npm start`
+### 📎 Drag & Drop для файлов
+- Перетаскивание файлов в любое место
+- Поддержка множественного выбора
+- Валидация размера файлов
+- Визуальная обратная связь при перетаскивании
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### 💬 Упоминания пользователей (@username)
+- Автодополнение при вводе @
+- Навигация клавиатурой (стрелки вверх/вниз, Enter)
+- Подсветка упоминаний в тексте
+- Фильтрация пользователей в реальном времени
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### ⚡ Skeleton Loaders
+- Красивая загрузка контента
+- Различные типы скелетонов (сообщения, чаты, задачи, профили)
+- Плавная анимация shimmer эффекта
 
-### `npm test`
+### 🎭 Анимации и переходы
+- Плавные переходы между страницами
+- Fade-in анимации для элементов
+- Hover эффекты с трансформацией
+- Красивые модальные окна с backdrop
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 📱 Адаптивная верстка
+- Поддержка мобильных устройств
+- Responsive дизайн
+- Touch-friendly интерфейс
+- Адаптивные модальные окна
 
-### `npm run build`
+## 🚀 Быстрый старт
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Установка
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+\`\`\`bash
+# Клонируйте репозиторий
+git clone https://github.com/YOUR_USERNAME/hive-messenger.git
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+# Перейдите в папку
+cd hive-messenger
 
-### `npm run eject`
+# Установите зависимости
+npm install
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+# Запустите проект
+npm start
+\`\`\`
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Требования
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+- Node.js >= 16.0.0
+- npm >= 8.0.0
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+## 📚 Использование
 
-## Learn More
+### Переключение темы
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+\`\`\`tsx
+import { useTheme } from './context/ThemeContext';
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+const MyComponent = () => {
+  const { isDark, toggleTheme } = useTheme();
+  
+  return (
+    <button onClick={toggleTheme}>
+      {isDark ? 'Светлая тема' : 'Темная тема'}
+    </button>
+  );
+};
+\`\`\`
+
+### Drag & Drop файлов
+
+\`\`\`tsx
+import FileDropZone from './components/FileDropZone';
+
+const MyComponent = () => {
+  const handleFiles = (files: File[]) => {
+    console.log('Выбраны файлы:', files);
+  };
+
+  return (
+    <FileDropZone
+      onFilesSelected={handleFiles}
+      maxSize={10} // MB
+      multiple={true}
+    />
+  );
+};
+\`\`\`
+
+### Skeleton Loaders
+
+\`\`\`tsx
+import { Skeleton } from './components/SkeletonLoaders';
+
+const MyComponent = () => {
+  const [loading, setLoading] = useState(true);
+
+  if (loading) {
+    return <Skeleton type="message" count={5} />;
+  }
+
+  return <div>Контент загружен!</div>;
+};
+\`\`\`
+
+### Упоминания пользователей
+
+\`\`\`tsx
+import MentionInput from './components/MentionInput';
+
+const MyComponent = () => {
+  const [comment, setComment] = useState('');
+  const users = [
+    { id: '1', name: 'Алексей Иванов', avatar: 'АИ' },
+    { id: '2', name: 'Мария Петрова', avatar: 'МП' }
+  ];
+
+  return (
+    <MentionInput
+      value={comment}
+      onChange={setComment}
+      users={users}
+      placeholder="Напишите комментарий..."
+    />
+  );
+};
+\`\`\`
+
+## 🎨 Кастомизация темы
+
+Все цвета определены через CSS-переменные в `src/styles/theme.css`:
+
+\`\`\`css
+:root[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --text-primary: #2c3e50;
+  --accent-primary: #667eea;
+  /* ... */
+}
+
+:root[data-theme="dark"] {
+  --bg-primary: #1a1a2e;
+  --text-primary: #e0e0e0;
+  --accent-primary: #7c8eea;
+  /* ... */
+}
+\`\`\`
+
+Вы можете легко изменить цвета под свой бренд!
+
+## 📁 Структура проекта
+
+\`\`\`
+src/
+├── components/          # Компоненты
+│   ├── FileDropZone.tsx       # Drag & Drop
+│   ├── SkeletonLoaders.tsx    # Загрузчики
+│   ├── MentionInput.tsx       # Упоминания
+│   ├── ThemeToggle.tsx        # Переключатель темы
+│   └── ...
+├── context/            # Контексты
+│   ├── ThemeContext.tsx       # Тема
+│   ├── AuthContext.tsx        # Авторизация
+│   └── ChatContext.tsx        # Чат
+├── pages/              # Страницы
+│   ├── TasksPage.tsx
+│   ├── ChatPage.tsx
+│   └── ...
+├── styles/             # Стили
+│   └── theme.css              # CSS-переменные и анимации
+└── App.tsx             # Главный компонент
+\`\`\`
+
+## 🛠️ Технологии
+
+- **React 18** - UI библиотека
+- **TypeScript** - Типизация
+- **React Router** - Навигация
+- **CSS Variables** - Темизация
+- **Context API** - Управление состоянием
+
+## 🎯 Roadmap
+
+- [ ] Виртуализация списков (react-window)
+- [ ] WebSocket для real-time обновлений
+- [ ] Push-уведомления
+- [ ] Голосовые сообщения
+- [ ] Видеозвонки
+- [ ] E2E шифрование
+
+## 📄 Лицензия
+
+MIT
+
+## 👥 Авторы
+
+- Андрей - разработчик
+
+## 🤝 Вклад
+
+Буду рад любым предложениям и PR!
+
+1. Fork проекта
+2. Создайте feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit изменения (`git commit -m 'Add AmazingFeature'`)
+4. Push в branch (`git push origin feature/AmazingFeature`)
+5. Откройте Pull Request
+
+## 📞 Контакты
+
+- GitHub: [@your-username](https://github.com/your-username)
+- Email: your-email@example.com
+
+---
+
+**Сделано с ❤️ для улучшения корпоративной коммуникации**

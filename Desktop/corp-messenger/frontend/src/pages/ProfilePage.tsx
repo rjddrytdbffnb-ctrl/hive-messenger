@@ -43,12 +43,12 @@ const ProfilePage: React.FC = () => {
     <div style={{ 
       padding: '40px', 
       minHeight: '100vh',
-      backgroundColor: '#ecf0f1'
+      backgroundColor: 'var(--bg-secondary)'
     }}>
       <div style={{
         maxWidth: '800px',
         margin: '0 auto',
-        backgroundColor: 'white',
+        backgroundColor: 'var(--bg-primary)',
         padding: '40px',
         borderRadius: '10px',
         boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
@@ -60,7 +60,7 @@ const ProfilePage: React.FC = () => {
           marginBottom: '30px'
         }}>
           <h1 style={{ 
-            color: '#2c3e50',
+            color: 'var(--text-primary)',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
@@ -121,7 +121,7 @@ const ProfilePage: React.FC = () => {
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                backgroundColor: 'white'
+                backgroundColor: 'var(--bg-primary)'
               }}></div>
               {user?.isOnline ? 'В сети' : 'Не в сети'}
             </div>
@@ -138,7 +138,7 @@ const ProfilePage: React.FC = () => {
                   marginBottom: '30px'
                 }}>
                   <div>
-                    <label style={{ display: 'block', color: '#2c3e50', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
+                    <label style={{ display: 'block', color: 'var(--text-primary)', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
                       Имя *
                     </label>
                     <input
@@ -149,7 +149,7 @@ const ProfilePage: React.FC = () => {
                       style={{
                         width: '100%',
                         padding: '10px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '5px',
                         fontSize: '16px'
                       }}
@@ -157,7 +157,7 @@ const ProfilePage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: '#2c3e50', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
+                    <label style={{ display: 'block', color: 'var(--text-primary)', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
                       Фамилия *
                     </label>
                     <input
@@ -168,7 +168,7 @@ const ProfilePage: React.FC = () => {
                       style={{
                         width: '100%',
                         padding: '10px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '5px',
                         fontSize: '16px'
                       }}
@@ -176,7 +176,7 @@ const ProfilePage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: '#2c3e50', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
+                    <label style={{ display: 'block', color: 'var(--text-primary)', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
                       Email *
                     </label>
                     <input
@@ -187,7 +187,7 @@ const ProfilePage: React.FC = () => {
                       style={{
                         width: '100%',
                         padding: '10px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '5px',
                         fontSize: '16px'
                       }}
@@ -195,7 +195,7 @@ const ProfilePage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: '#2c3e50', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
+                    <label style={{ display: 'block', color: 'var(--text-primary)', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
                       Имя пользователя *
                     </label>
                     <input
@@ -206,7 +206,7 @@ const ProfilePage: React.FC = () => {
                       style={{
                         width: '100%',
                         padding: '10px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '5px',
                         fontSize: '16px'
                       }}
@@ -214,7 +214,7 @@ const ProfilePage: React.FC = () => {
                     />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', color: '#2c3e50', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
+                    <label style={{ display: 'block', color: 'var(--text-primary)', fontSize: '14px', marginBottom: '8px', fontWeight: 'bold' }}>
                       Отдел *
                     </label>
                     <select
@@ -224,10 +224,10 @@ const ProfilePage: React.FC = () => {
                       style={{
                         width: '100%',
                         padding: '10px',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '5px',
                         fontSize: '16px',
-                        backgroundColor: 'white'
+                        backgroundColor: 'var(--bg-primary)'
                       }}
                       required
                     >
@@ -286,50 +286,50 @@ const ProfilePage: React.FC = () => {
                   marginBottom: '30px'
                 }}>
                   <div>
-                    <label style={{ display: 'block', color: '#7f8c8d', fontSize: '14px', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '5px' }}>
                       Имя
                     </label>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2c3e50' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                       {user?.firstName}
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: '#7f8c8d', fontSize: '14px', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '5px' }}>
                       Фамилия
                     </label>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2c3e50' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                       {user?.lastName}
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: '#7f8c8d', fontSize: '14px', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '5px' }}>
                       Email
                     </label>
-                    <div style={{ fontSize: '16px', color: '#34495e' }}>
+                    <div style={{ fontSize: '16px', color: 'var(--text-primary)' }}>
                       {user?.email}
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: '#7f8c8d', fontSize: '14px', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '5px' }}>
                       Имя пользователя
                     </label>
-                    <div style={{ fontSize: '16px', color: '#34495e' }}>
+                    <div style={{ fontSize: '16px', color: 'var(--text-primary)' }}>
                       @{user?.username}
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: '#7f8c8d', fontSize: '14px', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '5px' }}>
                       Отдел
                     </label>
-                    <div style={{ fontSize: '16px', color: '#34495e' }}>
+                    <div style={{ fontSize: '16px', color: 'var(--text-primary)' }}>
                       {user?.department}
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: '#7f8c8d', fontSize: '14px', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '5px' }}>
                       ID пользователя
                     </label>
-                    <div style={{ fontSize: '14px', color: '#7f8c8d', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '14px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
                       {user?.id}
                     </div>
                   </div>
@@ -337,28 +337,28 @@ const ProfilePage: React.FC = () => {
 
                 {/* Статистика */}
                 <div style={{
-                  backgroundColor: '#f8f9fa',
+                  backgroundColor: 'var(--bg-secondary)',
                   padding: '20px',
                   borderRadius: '8px',
                   marginTop: '20px'
                 }}>
-                  <h3 style={{ marginBottom: '15px', color: '#2c3e50' }}>📊 Статистика</h3>
+                  <h3 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>📊 Статистика</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3498db' }}>42</div>
-                      <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Сообщений</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Сообщений</div>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#2ecc71' }}>7</div>
-                      <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Чатов</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Чатов</div>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#e74c3c' }}>15</div>
-                      <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Дней в сети</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Дней в сети</div>
                     </div>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f39c12' }}>98%</div>
-                      <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Активность</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Активность</div>
                     </div>
                   </div>
                 </div>

@@ -11,7 +11,8 @@ const ChatPage: React.FC = () => {
       <div style={{
         display: 'flex',
         height: '100vh',
-        backgroundColor: 'white'
+        overflow: 'hidden',
+        backgroundColor: 'var(--bg-primary)'
       }}>
         {/* Список чатов */}
         <ChatList />
@@ -19,8 +20,10 @@ const ChatPage: React.FC = () => {
         {/* Основная область чата */}
         <div style={{
           flex: 1,
+          minWidth: 0,
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
           <MessageList />
           <MessageInput />

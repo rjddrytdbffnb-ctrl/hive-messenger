@@ -56,7 +56,7 @@ const RegisterPage = () => {
       padding: '20px'
     }}>
       <div style={{
-        backgroundColor: 'white',
+        backgroundColor: 'var(--bg-primary)',
         padding: '40px',
         borderRadius: '10px',
         boxShadow: '0 0 10px rgba(0,0,0,0.1)',
@@ -180,7 +180,7 @@ const RegisterPage = () => {
                 border: '1px solid #ddd',
                 borderRadius: '5px',
                 fontSize: '16px',
-                backgroundColor: 'white'
+                backgroundColor: 'var(--bg-primary)'
               }}
               required
             >

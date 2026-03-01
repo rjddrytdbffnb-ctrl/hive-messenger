@@ -3,96 +3,69 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ChatProvider } from './context/ChatContext';
+import { ThemeProvider } from './context/ThemeContext';
+
 import Header from './components/Header';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
 import ChatPage from './pages/ChatPage';
-import HelpPage from './pages/HelpPage';
+import TasksPage from './pages/TasksPage';
 import ProfilePage from './pages/ProfilePage';
-import './App.css';
+import SettingsPage from './pages/SettingsPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import HelpPage from './pages/HelpPage';
+import NotificationsPage from './pages/NotificationsPage';
+import EmployeesPage from './pages/EmployeesPage';
 
-// Компонент для защищенных маршрутов с Header
-const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Защищенный роут
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+};
+
+// Главный компонент приложения
+function AppContent() {
+  const { isAuthenticated } = useAuth();
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Header />
-      <main style={{ flex: 1 }}>
-        {children}
-      </main>
+    <div className="App" style={{ minHeight: '100vh', background: 'var(--bg-secondary)' }}>
+      {isAuthenticated && <Header />}
+      
+      <Routes>
+        {/* Публичные роуты */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+
+        {/* Защищенные роуты */}
+        <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
+        <Route path="/employees" element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/help" element={<ProtectedRoute><HelpPage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+
+        {/* Редирект на главную для неизвестных путей */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
     </div>
   );
-};
+}
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
-  
-  if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        fontSize: '18px'
-      }}>
-        Загрузка...
-      </div>
-    );
-  }
-  
-  return isAuthenticated ? <ProtectedLayout>{children}</ProtectedLayout> : <Navigate to="/login" />;
-};
-
+// Главная функция App с правильным порядком провайдеров
 function App() {
   return (
     <AuthProvider>
-      <ChatProvider>
+      <ThemeProvider>
         <Router>
-          <div className="App">
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route 
-                path="/" 
-                element={
-                  <ProtectedRoute>
-                    <HomePage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/chat" 
-                element={
-                  <ProtectedRoute>
-                    <ChatPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/help" 
-                element={
-                  <ProtectedRoute>
-                    <HelpPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/profile" 
-                element={
-                  <ProtectedRoute>
-                    <ProfilePage />
-                  </ProtectedRoute>
-                } 
-              />
-            </Routes>
-          </div>
+          <ChatProvider>
+            <AppContent />
+          </ChatProvider>
         </Router>
-      </ChatProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
 
 export default App;
-
-export {};
