@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест API корпоративного мессенджера</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input, textarea, button { width: 100%; padding: 8px; margin-bottom: 10px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { background: #f8f9fa; padding: 15px; margin-top: 20px; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тестирование API мессенджера</h1>
+        
+        <div class="form-group">
+            <h3>🔐 Тест входа</h3>
+            <label>Email:</label>
+            <input type="email" id="loginEmail" value="alexey@company.com">
+            <label>Пароль:</label>
+            <input type="password" id="loginPassword" value="password123">
+            <button onclick="testLogin()">Тестировать вход</button>
+        </div>
+
+        <div class="form-group">
+            <h3>👤 Тест регистрации</h3>
+            <label>Имя пользователя:</label>
+            <input type="text" id="regUsername" value="testuser">
+            <label>Email:</label>
+            <input type="email" id="regEmail" value="test@company.com">
+            <label>Пароль:</label>
+            <input type="password" id="regPassword" value="test123">
+            <label>Отдел:</label>
+            <input type="text" id="regDepartment" value="Testing">
+            <button onclick="testRegister()">Тестировать регистрацию</button>
+        </div>
+
+        <div class="form-group">
+            <h3>💬 Тест защищенных маршрутов</h3>
+            <button onclick="testProtected()" id="protectedBtn" disabled>Тестировать защищенные маршруты (требуется токен)</button>
+        </div>
+<!-- Добавьте этот блок в test.html после других form-group -->
+
+
+<div class="form-group">
+    <h3>🔔 Тест уведомлений</h3>
+    <button onclick="getNotifications()">Получить уведомления</button>
+    <button onclick="testMention()">Тест упоминания (@username)</button>
+    <div id="notificationsList" style="margin-top: 10px;"></div>
+</div>
+
+<div class="form-group">
+    <h3>😊 Тест реакций</h3>
+    <input type="number" id="reactionMessageId" placeholder="ID сообщения" value="1">
+    <input type="text" id="reactionEmoji" placeholder="Эмодзи" value="👍">
+    <button onclick="addReaction()">Добавить реакцию</button>
+    <button onclick="removeReaction()">Удалить реакцию</button>
+</div>
+
+<div class="form-group">
+    <h3>🔍 Поиск в чатах</h3>
+    <input type="number" id="searchChatId" placeholder="ID чата" value="1">
+    <input type="text" id="searchQuery" placeholder="Поисковый запрос" value="привет">
+    <button onclick="searchMessages()">Искать сообщения</button>
+</div>
+
+<script>
+    // Уведомления
+    async function getNotifications() {
+        try {
+            const response = await fetch('/api/notifications', {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            displayNotifications(data.notifications);
+        } catch (error) {
+            console.error('Ошибка получения уведомлений:', error);
+        }
+    }
+
+    function displayNotifications(notifications) {
+        const container = document.getElementById('notificationsList');
+        container.innerHTML = '<h4>Уведомления:</h4>';
+        
+        notifications.forEach(notif => {
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <div style="border: 1px solid #ddd; padding: 5px; margin: 2px; border-radius: 3px;">
+                    <strong>${notif.type}</strong>: ${JSON.stringify(notif.data)}
+                    <small>${new Date(notif.created_at).toLocaleString()}</small>
+                    ${!notif.is_read ? ' 🔵' : ''}
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function testMention() {
+        if (!socket) {
+            alert('Сначала подключитесь к WebSocket');
+            return;
+        }
+        
+        socket.emit('send_message', {
+            chatId: 1,
+            text: 'Привет @alexey, как дела?'
+        });
+    }
+
+    // Реакции
+    function addReaction() {
+        if (!socket) {
+            alert('Сначала подключитесь к WebSocket');
+            return;
+        }
+        
+        const messageId = document.getElementById('reactionMessageId').value;
+        const emoji = document.getElementById('reactionEmoji').value;
+        
+        socket.emit('add_reaction', {
+            messageId: parseInt(messageId),
+            emoji: emoji
+        });
+    }
+
+    function removeReaction() {
+        if (!socket) {
+            alert('Сначала подключитесь к WebSocket');
+            return;
+        }
+        
+        const messageId = document.getElementById('reactionMessageId').value;
+        const emoji = document.getElementById('reactionEmoji').value;
+        
+        socket.emit('remove_reaction', {
+            messageId: parseInt(messageId),
+            emoji: emoji
+        });
+    }
+
+    // Поиск
+    async function searchMessages() {
+        const chatId = document.getElementById('searchChatId').value;
+        const query = document.getElementById('searchQuery').value;
+        
+        try {
+            const response = await fetch(`/api/chats/${chatId}/search?query=${encodeURIComponent(query)}`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            showResult(data);
+        } catch (error) {
+            console.error('Ошибка поиска:', error);
+        }
+    }
+
+    // Обработка новых WebSocket событий
+    if (socket) {
+        socket.on('new_notification', (notification) => {
+            addWsMessage(`🔔 Новое уведомление: ${notification.type}`);
+        });
+
+        socket.on('reaction_added', (data) => {
+            addWsMessage(`😊 ${data.reaction.username} поставил(а) ${data.reaction.emoji} на сообщение ${data.messageId}`);
+        });
+
+        socket.on('reaction_removed', (data) => {
+            addWsMessage(`😊 Реакция ${data.emoji} удалена с сообщения ${data.messageId}`);
+        });
+
+        socket.on('new_system_message', (data) => {
+            addWsMessage(`⚡ Системное сообщение: ${data.message.text}`);
+        });
+    }
+
+<div class="form-group">
+    <h3>⚡ Тест WebSocket</h3>
+    <button onclick="connectWebSocket()" id="wsConnectBtn">Подключиться к WebSocket</button>
+    <button onclick="testWebSocketMessage()" id="wsMessageBtn" disabled>Отправить тестовое сообщение</button>
+    <div id="wsStatus">Статус: Не подключено</div>
+    <div id="wsMessages" style="max-height: 200px; overflow-y: auto; margin-top: 10px;"></div>
+</div>
+
+<script>
+    let socket = null;
+
+    function connectWebSocket() {
+        if (!authToken) {
+            showResult({ error: 'Сначала выполните вход для получения токена' });
+            return;
+        }
+
+        try {
+            // Подключаемся к WebSocket
+            socket = io('http://localhost:3000', {
+                auth: {
+                    token: authToken
+                }
+            });
+
+            socket.on('connect', () => {
+                document.getElementById('wsStatus').textContent = 'Статус: ✅ Подключено';
+                document.getElementById('wsMessageBtn').disabled = false;
+                document.getElementById('wsConnectBtn').disabled = true;
+                addWsMessage('✅ WebSocket подключен');
+                
+                // Присоединяемся к чатам
+                socket.emit('join_chats');
+            });
+
+            socket.on('new_message', (data) => {
+                addWsMessage(`💬 Новое сообщение от ${data.user.username}: ${data.message.text}`);
+            });
+
+            socket.on('user_typing', (data) => {
+                addWsMessage(`✍️ ${data.username} печатает...`);
+            });
+
+            socket.on('user_status_change', (data) => {
+                addWsMessage(`👤 ${data.username} теперь ${data.status}`);
+            });
+
+            socket.on('disconnect', () => {
+                document.getElementById('wsStatus').textContent = 'Статус: ❌ Отключено';
+                document.getElementById('wsMessageBtn').disabled = true;
+                document.getElementById('wsConnectBtn').disabled = false;
+                addWsMessage('❌ WebSocket отключен');
+            });
+
+            socket.on('error', (error) => {
+                addWsMessage(`❌ Ошибка: ${error.message}`);
+            });
+
+        } catch (error) {
+            showResult({ error: 'Ошибка подключения WebSocket: ' + error.message });
+        }
+    }
+
+    function testWebSocketMessage() {
+        if (!socket) {
+            showResult({ error: 'WebSocket не подключен' });
+            return;
+        }
+
+        // Отправляем тестовое сообщение в первый чат
+        socket.emit('send_message', {
+            chatId: 1,
+            text: 'Тестовое сообщение через WebSocket! ' + new Date().toLocaleTimeString()
+        });
+    }
+
+    function addWsMessage(message) {
+        const wsMessages = document.getElementById('wsMessages');
+        const messageDiv = document.createElement('div');
+        messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        messageDiv.style.padding = '2px 0';
+        messageDiv.style.fontSize = '12px';
+        wsMessages.appendChild(messageDiv);
+        wsMessages.scrollTop = wsMessages.scrollHeight;
+    }
+</script>
+
+        <div id="result" class="result" style="display: none;">
+            <h3>Результат:</h3>
+            <pre id="resultText"></pre>
+        </div>
+    </div>
+
+    <script>
+        let authToken = '';
+
+        async function testLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch('http://localhost:3000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                showResult(data);
+                
+                if (data.token) {
+                    authToken = data.token;
+                    document.getElementById('protectedBtn').disabled = false;
+                    console.log('🔑 Токен сохранен:', authToken);
+                }
+            } catch (error) {
+                showResult({ error: error.message });
+            }
+        }
+
+        async function testRegister() {
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const department = document.getElementById('regDepartment').value;
+
+            try {
+                const response = await fetch('http://localhost:3000/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, email, password, department })
+                });
+
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult({ error: error.message });
+            }
+        }
+
+        async function testProtected() {
+            if (!authToken) {
+                showResult({ error: 'Сначала выполните вход для получения токена' });
+                return;
+            }
+
+            try {
+                // Тестируем получение списка чатов
+                const response = await fetch('http://localhost:3000/api/chats', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult({ error: error.message });
+            }
+        }
+
+        function showResult(data) {
+            const resultDiv = document.getElementById('result');
+            const resultText = document.getElementById('resultText');
+            
+            resultText.textContent = JSON.stringify(data, null, 2);
+            resultDiv.style.display = 'block';
+            
+            if (data.error) {
+                resultText.className = 'error';
+            } else {
+                resultText.className = 'success';
+            }
+        }
+    </script>
+</body>
+</html>
