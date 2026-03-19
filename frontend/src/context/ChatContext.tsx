@@ -44,7 +44,7 @@ export interface Message {
   isDeleted?: boolean;
   isEdited?: boolean;
   replyTo?: Message;
-  attachments?: File[];
+  attachments?: (File | { url: string; original_name?: string; name?: string; mime_type?: string; type?: string; size: number; id?: string | number })[];
   mediaFiles?: MediaFile[];
   reactions?: Reaction[];
 }
@@ -132,6 +132,17 @@ function mapRawMessage(raw: any, chatId: string): Message {
     timestamp: raw.created_at || new Date().toISOString(),
     isRead: raw.is_read || false,
     reactions: [],
+    attachments: (raw.attachments && raw.attachments.length > 0)
+      ? raw.attachments.map((f: any) => ({
+          url: f.url,
+          original_name: f.original_name || f.filename || 'Файл',
+          name: f.original_name || f.filename || 'Файл',
+          mime_type: f.mime_type || '',
+          type: f.mime_type || '',
+          size: f.size || 0,
+          id: f.id,
+        }))
+      : undefined,
   };
 }
 
