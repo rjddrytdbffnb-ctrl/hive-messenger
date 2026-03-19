@@ -114,14 +114,19 @@ export function pushNotification(title: string, message: string, type: string) {
 
 // Маппинг сырого сообщения из API/сокета в Message
 function mapRawMessage(raw: any, chatId: string): Message {
+  // Бэкенд всегда возвращает объект sender: { id, username, first_name, last_name }
+  // raw.sender_id есть у POST-ответа, но id надо брать из sender объекта
+  const sender = raw.sender || {};
   return {
     id: String(raw.id),
     chatId: String(chatId),
     sender: {
-      id: String(raw.user_id || raw.sender?.id || ''),
-      firstName: raw.first_name || raw.sender?.firstName || raw.username || '',
-      lastName: raw.last_name || raw.sender?.lastName || '',
-      isOnline: true,
+      id: String(sender.id || raw.sender_id || raw.user_id || ''),
+      firstName: sender.first_name || sender.username || raw.first_name || '',
+      lastName: sender.last_name || raw.last_name || '',
+      isOnline: sender.is_online || false,
+      avatar: sender.avatar,
+      department: sender.department,
     },
     text: raw.text || '',
     timestamp: raw.created_at || new Date().toISOString(),
@@ -246,22 +251,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       socket.emit('user_online');
     });
 
-    socket.on('new_message', ({ message, user: sender }: any) => {
+    socket.on('new_message', ({ message }: any) => {
       const chatId = String(message.chat_id);
-      const newMsg: Message = {
-        id: String(message.id),
-        chatId,
-        sender: {
-          id: String(message.user_id),
-          firstName: sender?.username || message.username || '',
-          lastName: '',
-          isOnline: true,
-        },
-        text: message.text || '',
-        timestamp: message.created_at || new Date().toISOString(),
-        isRead: false,
-        reactions: [],
-      };
+      // Бэкенд передаёт { message } где message содержит sender объект
+      const newMsg: Message = mapRawMessage(message, chatId);
 
       setMessages(prev => {
         // Не дублируем если уже есть
