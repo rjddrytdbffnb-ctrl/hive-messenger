@@ -60,43 +60,29 @@ const EmployeesPage: React.FC = () => {
     loadEmployees();
   }, [user]);
 
-  const loadEmployees = () => {
-    const allEmployees: Employee[] = [];
+  const loadEmployees = async () => {
+    try {
+      const { usersAPI } = await import('../services/api');
+      const response = await usersAPI.getAll();
+      const rawUsers = response.data.users;
 
-    if (user) {
-      allEmployees.push({
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        username: user.username,
-        email: user.email,
-        department: user.department,
-        avatar: `${user.firstName[0]}${user.lastName[0]}`,
-        isOnline: true,
-        position: 'Employee',
-        role: 'employee'
-      });
+      const mapped: Employee[] = rawUsers.map((u: any) => ({
+        id: String(u.id),
+        firstName: u.first_name || '',
+        lastName: u.last_name || '',
+        username: u.username,
+        email: u.email,
+        department: u.department || 'Other',
+        avatar: u.avatar || `${(u.first_name||'?')[0]}${(u.last_name||'')[0]}`,
+        isOnline: u.is_online || false,
+        position: u.position || 'Employee',
+        role: u.role || 'employee',
+      }));
+
+      setEmployees(applyEdits(mapped));
+    } catch (err) {
+      console.error('Ошибка загрузки сотрудников:', err);
     }
-
-    const mockEmployees: Employee[] = [
-      { id: 'ceo1', firstName: 'Владимир', lastName: 'Соколов', username: 'vsokolov', email: 'vsokolov@company.com', department: 'Management', avatar: 'ВС', isOnline: true, position: 'CEO', role: 'ceo' },
-      { id: '2', firstName: 'Мария', lastName: 'Петрова', username: 'mpetro', email: 'mpetro@company.com', department: 'Marketing', avatar: 'МП', isOnline: true, position: 'Marketing Manager', role: 'manager', managerId: 'ceo1' },
-      { id: '3', firstName: 'Дмитрий', lastName: 'Сидоров', username: 'dsidorov', email: 'dsidorov@company.com', department: 'Sales', avatar: 'ДС', isOnline: true, position: 'Sales Manager', role: 'manager', managerId: 'ceo1' },
-      { id: '7', firstName: 'Сергей', lastName: 'Михайлов', username: 'smikhailov', email: 'smikhailov@company.com', department: 'IT', avatar: 'СМ', isOnline: true, position: 'IT Manager', role: 'manager', managerId: 'ceo1' },
-      { id: '4', firstName: 'Елена', lastName: 'Смирнова', username: 'esmirno', email: 'esmirno@company.com', department: 'HR', avatar: 'ЕС', isOnline: true, position: 'HR Specialist', role: 'employee', managerId: 'ceo1' },
-      { id: '5', firstName: 'Иван', lastName: 'Козлов', username: 'ikozlov', email: 'ikozlov@company.com', department: 'IT', avatar: 'ИК', isOnline: false, position: 'Backend Developer', role: 'employee', managerId: '7' },
-      { id: '6', firstName: 'Алексей', lastName: 'Иванов', username: 'aivanov', email: 'aivanov@company.com', department: 'IT', avatar: 'АИ', isOnline: true, position: 'Senior Developer', role: 'employee', managerId: '7' },
-      { id: '8', firstName: 'Ольга', lastName: 'Волкова', username: 'ovolkova', email: 'ovolkova@company.com', department: 'Marketing', avatar: 'ОВ', isOnline: true, position: 'Marketing Specialist', role: 'employee', managerId: '2' },
-      { id: '9', firstName: 'Андрей', lastName: 'Новиков', username: 'anovik', email: 'anovik@company.com', department: 'Sales', avatar: 'АН', isOnline: false, position: 'Sales Representative', role: 'employee', managerId: '3' },
-    ];
-
-    allEmployees.push(...mockEmployees);
-
-    const unique = allEmployees.filter((emp, index, self) =>
-      index === self.findIndex((e) => e.id === emp.id)
-    );
-
-    setEmployees(applyEdits(unique));
   };
 
   const departments = ['all', 'IT', 'Marketing', 'Sales', 'HR', 'Finance', 'Management'];
