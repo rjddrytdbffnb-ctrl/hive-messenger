@@ -167,6 +167,27 @@ app.get('/api/users', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/users/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { first_name, last_name, email, department, position, role } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE users SET
+        first_name = COALESCE($1, first_name),
+        last_name  = COALESCE($2, last_name),
+        email      = COALESCE($3, email),
+        department = COALESCE($4, department)
+       WHERE id = $5
+       RETURNING id, username, email, first_name, last_name, department, avatar, is_online`,
+      [first_name ?? null, last_name ?? null, email ?? null, department ?? null, id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Пользователь не найден' });
+    res.json({ user: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
+
 // ============================================================
 // CHATS
 // ============================================================
