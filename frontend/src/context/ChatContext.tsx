@@ -328,7 +328,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setMessages(prev => [...prev, botMsg]);
       setTimeout(() => {
         const botId = activeChat.participants?.[0]?.id || 'bot';
-        const reply = getSmartBotResponse(botId, text, user ? `${user.firstName} ${user.lastName}` : 'Пользователь');
+        const reply = getSmartBotResponse(botId, text);
         const replyMsg: Message = {
           id: (Date.now() + 1).toString(),
           chatId: activeChat.id,
