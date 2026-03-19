@@ -11,33 +11,17 @@ const { setupSocket } = require('./socketHandler');
 const { NotificationService } = require('./notificationService');
 
 const multer = require('multer');
-const fs     = require('fs');
-
-const multer = require('multer');
 const app    = express();
 const PORT   = process.env.PORT || 3000;
 const server = http.createServer(app);
 const io     = setupSocket(server);
 app.set('io', io);
 
-// Multer — хранение файлов в памяти (для Railway без диска)
+// Multer — хранение в памяти (Railway не имеет постоянного диска)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
-
-// Загрузка файлов — храним в /tmp/uploads на Railway
-const uploadDir = process.env.UPLOAD_DIR || '/tmp/uploads';
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, Date.now() + '_' + safe);
-  }
-});
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
