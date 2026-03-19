@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { pushNotification } from '../context/ChatContext';
 import { usersAPI } from '../services/api';
+import GalleryPicker, { GalleryFile } from '../components/GalleryPicker';
 
 interface TaskUser {
   id: string;
@@ -816,6 +817,8 @@ const RequestModal: React.FC<{
   const [priority, setPriority] = useState<Task['priority']>('medium');
   const [dueDate, setDueDate] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryFiles, setGalleryFiles] = useState<GalleryFile[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [modalDeptFilter, setModalDeptFilter] = useState<string>('all');
@@ -834,6 +837,11 @@ const RequestModal: React.FC<{
     const files = Array.from(e.target.files || []);
     setAttachedFiles(prev => [...prev, ...files]);
     setTimeout(() => { e.target.value = ''; }, 0);
+  };
+
+  const handleGallerySelect = (files: GalleryFile[]) => {
+    setGalleryFiles(prev => [...prev, ...files]);
+    setShowGallery(false);
   };
 
   const getFileIcon = (file: File) => {
@@ -887,6 +895,16 @@ const RequestModal: React.FC<{
           files: [],
           comments: [],
         };
+        // Сохраняем файлы из галереи как комментарии с ссылками
+        const taskFiles: TaskFile[] = galleryFiles.map(gf => ({
+          id: gf.id,
+          name: gf.name,
+          size: gf.size,
+          url: gf.url,
+          uploadedBy: currentUser.name,
+          uploadedAt: new Date().toLocaleString('ru-RU'),
+        }));
+        newTask.files = taskFiles;
         pushNotification(`📋 Новая заявка: «${newTask.title}»`, `Исполнитель: ${newTask.assignedTo}`, 'task');
         setTimeout(() => onSubmit(newTask), 1400);
       }
@@ -1032,6 +1050,23 @@ const RequestModal: React.FC<{
                   📎 Прикрепить файл
                   <input type="file" multiple onChange={handleFileChange} style={{ display: 'none' }} />
                 </label>
+                <button type="button" onClick={() => setShowGallery(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', border: '1.5px dashed #764ba2', borderRadius: '9px', background: 'rgba(118,75,162,0.04)', color: '#764ba2', fontSize: '13px', fontWeight: '600', cursor: 'pointer', width: '100%', marginTop: '8px' }}>
+                  🗂️ Из галереи
+                </button>
+                {galleryFiles.length > 0 && (
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {galleryFiles.map((file, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 11px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <span>{file.type === 'image' ? '🖼️' : file.type === 'video' ? '🎬' : '📎'}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{file.size}</div>
+                        </div>
+                        <button onClick={() => setGalleryFiles(p => p.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '13px' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {attachedFiles.length > 0 && (
                   <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     {attachedFiles.map((file, idx) => (
