@@ -39,7 +39,7 @@ const EmployeesPage: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const API_BASE = process.env.REACT_APP_API_URL || '';
-      const res = await fetch(`${API_BASE}/api/users/${updated.id}`, {
+      await fetch(`${API_BASE}/api/users/${updated.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -54,9 +54,6 @@ const EmployeesPage: React.FC = () => {
           role: updated.role,
         })
       });
-      const data = await res.json();
-      console.log('Сохранение:', res.status, JSON.stringify(data));
-      alert('Сохранено: ' + res.status + ' ' + JSON.stringify(data));
     } catch (err) {
       console.error('Ошибка сохранения на сервер:', err);
       alert('Ошибка: ' + err);
