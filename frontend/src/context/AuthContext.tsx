@@ -133,6 +133,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       localStorage.setItem('token', token);
       const mappedUser = mapUser(rawUser);
+      localStorage.setItem('user', JSON.stringify(mappedUser));
       setUser(mappedUser);
 
       return { success: true };
@@ -157,6 +158,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       localStorage.setItem('token', token);
       const mappedUser = mapUser(rawUser);
+      localStorage.setItem('user', JSON.stringify(mappedUser));
       setUser(mappedUser);
 
       return { success: true };
