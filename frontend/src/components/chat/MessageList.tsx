@@ -188,13 +188,10 @@ const MessageList: React.FC = () => {
                   {message.attachments && message.attachments.length > 0 && (
                     <div style={{ marginTop: message.text ? '8px' : '0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       {message.attachments.map((file: any, idx: number) => {
-                        // Поддержка обоих форматов: File объект и серверный объект {url, original_name}
                         const isFileObj = file instanceof File;
                         const fileName = isFileObj ? file.name : (file.original_name || file.name || 'Файл');
                         const mimeType = isFileObj ? file.type : (file.mime_type || file.type || '');
                         const fileSize = file.size || 0;
-                        const fileUrl = isFileObj ? null : file.url;
-
                         const isImage = mimeType.startsWith('image/');
                         const icon = mimeType.includes('pdf') ? '📄'
                           : mimeType.includes('word') || mimeType.includes('document') ? '📝'
@@ -202,7 +199,7 @@ const MessageList: React.FC = () => {
                           : isImage ? '🖼️' : '📎';
 
                         const getUrl = () => {
-                          if (fileUrl) return fileUrl;
+                          if (!isFileObj && file.url) return file.url;
                           if (isFileObj) return URL.createObjectURL(file);
                           return '#';
                         };
