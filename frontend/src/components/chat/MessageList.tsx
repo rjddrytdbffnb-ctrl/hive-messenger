@@ -187,20 +187,33 @@ const MessageList: React.FC = () => {
                   {/* Вложения */}
                   {message.attachments && message.attachments.length > 0 && (
                     <div style={{ marginTop: message.text ? '8px' : '0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {message.attachments.map((file, idx) => {
-                        const isImage = file.type.startsWith('image/');
-                        const icon = file.type.includes('pdf') ? '📄'
-                          : file.type.includes('word') || file.type.includes('document') ? '📝'
-                          : file.type.includes('sheet') || file.type.includes('excel') ? '📊'
+                      {message.attachments.map((file: any, idx: number) => {
+                        // Поддержка обоих форматов: File объект и серверный объект {url, original_name}
+                        const isFileObj = file instanceof File;
+                        const fileName = isFileObj ? file.name : (file.original_name || file.name || 'Файл');
+                        const mimeType = isFileObj ? file.type : (file.mime_type || file.type || '');
+                        const fileSize = file.size || 0;
+                        const fileUrl = isFileObj ? null : file.url;
+
+                        const isImage = mimeType.startsWith('image/');
+                        const icon = mimeType.includes('pdf') ? '📄'
+                          : mimeType.includes('word') || mimeType.includes('document') ? '📝'
+                          : mimeType.includes('sheet') || mimeType.includes('excel') ? '📊'
                           : isImage ? '🖼️' : '📎';
 
+                        const getUrl = () => {
+                          if (fileUrl) return fileUrl;
+                          if (isFileObj) return URL.createObjectURL(file);
+                          return '#';
+                        };
+
                         if (isImage) {
-                          const url = URL.createObjectURL(file);
+                          const url = getUrl();
                           return (
                             <img
                               key={idx}
                               src={url}
-                              alt={file.name}
+                              alt={fileName}
                               style={{
                                 maxWidth: '240px',
                                 maxHeight: '180px',
@@ -228,10 +241,10 @@ const MessageList: React.FC = () => {
                               maxWidth: '220px'
                             }}
                             onClick={() => {
-                              const url = URL.createObjectURL(file);
+                              const url = getUrl();
                               const a = document.createElement('a');
                               a.href = url;
-                              a.download = file.name;
+                              a.download = fileName;
                               a.click();
                             }}
                           >
@@ -245,10 +258,10 @@ const MessageList: React.FC = () => {
                                 whiteSpace: 'nowrap',
                                 color: isMyMessage ? 'white' : 'var(--text-primary)'
                               }}>
-                                {file.name}
+                                {fileName}
                               </div>
                               <div style={{ fontSize: '11px', opacity: 0.7 }}>
-                                {(file.size / 1024).toFixed(0)} KB
+                                {fileSize > 0 ? (fileSize / 1024).toFixed(0) + ' KB' : ''}
                               </div>
                             </div>
                           </div>
