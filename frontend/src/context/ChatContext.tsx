@@ -151,8 +151,18 @@ function mapRawChat(raw: any): Chat {
     isPinned: false,
     isArchived: false,
     isMuted: false,
-    isOnline: false,
-    participants: [],
+    // isOnline берём из участников (для direct чата — онлайн собеседника)
+    isOnline: raw.participants
+      ? (raw.participants as any[]).some((p: any) => p.is_online)
+      : false,
+    participants: (raw.participants || []).map((p: any) => ({
+      id: String(p.id),
+      firstName: p.first_name || p.username || '',
+      lastName: p.last_name || '',
+      isOnline: p.is_online || false,
+      avatar: p.avatar,
+      department: p.department,
+    })),
     messages: [],
   };
 }
@@ -285,6 +295,42 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ));
     });
 
+    // Обновляем онлайн-статус в реальном времени
+    socket.on('user_status_change', ({ userId, status }: { userId: string; status: string }) => {
+      const isOnline = status === 'online';
+      const uid = String(userId);
+
+      // Обновляем список чатов
+      setChats(prev => prev.map(c => {
+        if (!c.participants?.some(p => String(p.id) === uid)) return c;
+        return {
+          ...c,
+          isOnline: c.type === 'direct' ? isOnline : c.isOnline,
+          participants: (c.participants || []).map(p =>
+            String(p.id) === uid ? { ...p, isOnline } : p
+          ),
+        };
+      }));
+
+      // Обновляем активный чат чтобы шапка сразу изменилась
+      setActiveChat(prev => {
+        if (!prev) return prev;
+        if (!prev.participants?.some(p => String(p.id) === uid)) return prev;
+        return {
+          ...prev,
+          isOnline: prev.type === 'direct' ? isOnline : prev.isOnline,
+          participants: (prev.participants || []).map(p =>
+            String(p.id) === uid ? { ...p, isOnline } : p
+          ),
+        };
+      });
+
+      // Уведомляем другие компоненты (EmployeesPage) через custom event
+      window.dispatchEvent(new CustomEvent('user_status_change', {
+        detail: { userId: uid, isOnline }
+      }));
+    });
+
     socket.on('disconnect', (reason) => {
       console.log('❌ Socket отключён:', reason);
     });
@@ -363,28 +409,37 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isOnline: true,
         avatar: user!.avatar,
       },
-      text: text.trim(),
+      text: text.trim() || (files?.length ? files.map(f => f.name).join(', ') : ''),
       timestamp: new Date().toISOString(),
       isRead: false,
       reactions: [],
+      attachments: files && files.length > 0 ? files : undefined,
     };
     setMessages(prev => [...prev, optimisticMsg]);
     setChats(prev => prev.map(c =>
       c.id === currentChatId
-        ? { ...c, lastMessage: text.trim(), lastMessageTime: 'Сейчас' }
+        ? { ...c, lastMessage: text.trim() || 'Файл', lastMessageTime: 'Сейчас' }
         : c
     ));
 
-    messagesAPI.send(currentChatId, text.trim()).then(response => {
+    // Если есть файлы — отправляем через multipart, иначе обычный JSON
+    const sendPromise = (files && files.length > 0)
+      ? (() => {
+          const formData = new FormData();
+          if (text.trim()) formData.append('text', text.trim());
+          else formData.append('text', ' '); // бэкенд требует непустой text
+          files.forEach(f => formData.append('files', f));
+          return messagesAPI.sendWithFile(currentChatId, formData);
+        })()
+      : messagesAPI.send(currentChatId, text.trim());
+
+    sendPromise.then(response => {
       const realId = String(response.data.message.id);
-      // Заменяем tempId на реальный id от сервера
-      // Когда socket-событие придёт с тем же id — дедупликация его отбросит
       setMessages(prev => prev.map(m =>
         m.id === tempId ? { ...m, id: realId } : m
       ));
     }).catch(err => {
       console.error('Ошибка отправки:', err);
-      // Убираем оптимистичное сообщение если ошибка
       setMessages(prev => prev.filter(m => m.id !== tempId));
     });
   };
