@@ -925,6 +925,13 @@ const RequestModal: React.FC<{
 
   return (
     <>
+      {showGallery && (
+        <GalleryPicker
+          onSelect={handleGallerySelect}
+          onClose={() => setShowGallery(false)}
+          multiple={true}
+        />
+      )}
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, backdropFilter: 'blur(6px)' }} />
       <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--bg-primary)', borderRadius: '20px', zIndex: 1001, maxWidth: '520px', width: '92%', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.3)', border: '1px solid var(--border-color)' }}>
         {submitted ? (
