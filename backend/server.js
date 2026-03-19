@@ -249,8 +249,21 @@ app.post('/api/chats/direct', authenticateToken, async (req, res) => {
       WHERE c.type = 'direct'
     `, [req.user.id, targetUserId]);
 
-    if (existing.rows.length > 0)
-      return res.json({ chat: { id: existing.rows[0].id } });
+    if (existing.rows.length > 0) {
+      // Возвращаем полный объект чата чтобы фронтенд мог правильно отобразить
+      const { rows: fullChat } = await pool.query(`
+        SELECT c.*, 
+          (SELECT json_agg(row_to_json(p)) FROM (
+            SELECT u3.id, u3.username, u3.first_name, u3.last_name,
+                   u3.department, u3.avatar, u3.is_online
+            FROM chat_members cm2
+            JOIN users u3 ON u3.id = cm2.user_id
+            WHERE cm2.chat_id = c.id
+          ) p) AS participants
+        FROM chats c WHERE c.id = $1
+      `, [existing.rows[0].id]);
+      return res.json({ chat: fullChat[0] });
+    }
 
     const target = await pool.query(
       'SELECT first_name, last_name, username FROM users WHERE id=$1', [targetUserId]
