@@ -1,5 +1,5 @@
 // src/components/chat/MessageList.tsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -198,18 +198,14 @@ const MessageList: React.FC = () => {
                           : mimeType.includes('sheet') || mimeType.includes('excel') ? '📊'
                           : isImage ? '🖼️' : '📎';
 
-                        const getUrl = () => {
-                          if (!isFileObj && file.url) return file.url;
-                          if (isFileObj) return URL.createObjectURL(file);
-                          return '#';
-                        };
+                        // Получаем URL — для File объектов используем blob только если нет серверного url
+                        const fileUrl = (!isFileObj && file.url) ? file.url : (isFileObj ? URL.createObjectURL(file) : '#');
 
                         if (isImage) {
-                          const url = getUrl();
                           return (
                             <img
                               key={idx}
-                              src={url}
+                              src={fileUrl}
                               alt={fileName}
                               style={{
                                 maxWidth: '240px',
@@ -219,7 +215,7 @@ const MessageList: React.FC = () => {
                                 display: 'block',
                                 cursor: 'pointer'
                               }}
-                              onClick={() => window.open(url, '_blank')}
+                              onClick={() => window.open(fileUrl, '_blank')}
                             />
                           );
                         }
@@ -238,9 +234,8 @@ const MessageList: React.FC = () => {
                               maxWidth: '220px'
                             }}
                             onClick={() => {
-                              const url = getUrl();
                               const a = document.createElement('a');
-                              a.href = url;
+                              a.href = fileUrl;
                               a.download = fileName;
                               a.click();
                             }}
