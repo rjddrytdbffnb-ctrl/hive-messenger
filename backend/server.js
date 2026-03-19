@@ -750,6 +750,48 @@ app.delete('/api/tasks/:taskId/files/:fileId', authenticateToken, async (req, re
 });
 
 // ============================================================
+// MEDIA GALLERY
+// ============================================================
+
+app.post('/api/media', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+    const base64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+    const ext = req.file.originalname.split('.').pop()?.toLowerCase() || '';
+    const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+    const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext);
+    const fileType = isImage ? 'image' : isVideo ? 'video' : 'file';
+    const { rows } = await pool.query(
+      `INSERT INTO files (message_id, filename, original_name, mime_type, size, url)
+       VALUES (NULL, $1, $2, $3, $4, $5) RETURNING id, original_name, mime_type, size, url, created_at`,
+      [req.file.originalname, req.file.originalname, req.file.mimetype, req.file.size, dataUrl]
+    );
+    res.json({ file: { ...rows[0], type: fileType, uploader_id: req.user.id } });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
+
+app.get('/api/media', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT f.id, f.original_name as name, f.mime_type, f.size, f.url, f.created_at,
+              u.first_name, u.last_name
+       FROM files f
+       LEFT JOIN messages m ON m.id = f.message_id
+       LEFT JOIN users u ON u.id = m.sender_id
+       WHERE f.message_id IS NULL OR f.message_id IS NOT NULL
+       ORDER BY f.created_at DESC
+       LIMIT 200`
+    );
+    res.json({ files: rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
+
+// ============================================================
 // NOTIFICATIONS
 // ============================================================
 
