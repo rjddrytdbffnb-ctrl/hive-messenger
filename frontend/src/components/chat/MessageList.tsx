@@ -3,6 +3,70 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 
+// Компонент для одного файла — создаёт blob URL один раз через useEffect
+const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, isMyMessage }) => {
+  const isFileObj = file instanceof File;
+  const fileName = isFileObj ? file.name : (file.original_name || file.name || 'Файл');
+  const mimeType = isFileObj ? file.type : (file.mime_type || file.type || '');
+  const fileSize = file.size || 0;
+  const isImage = mimeType.startsWith('image/');
+
+  // Для серверных файлов используем url напрямую, для File объектов — создаём blob один раз
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (isFileObj) {
+      const url = URL.createObjectURL(file);
+      setBlobUrl(url);
+      return () => URL.revokeObjectURL(url); // очищаем при unmount
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fileUrl = isFileObj ? (blobUrl || '#') : (file.url || '#');
+
+  const icon = mimeType.includes('pdf') ? '📄'
+    : mimeType.includes('word') || mimeType.includes('document') ? '📝'
+    : mimeType.includes('sheet') || mimeType.includes('excel') ? '📊'
+    : isImage ? '🖼️' : '📎';
+
+  if (isImage && fileUrl !== '#') {
+    return (
+      <img
+        src={fileUrl}
+        alt={fileName}
+        style={{ maxWidth: '240px', maxHeight: '180px', borderRadius: '8px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
+        onClick={() => window.open(fileUrl, '_blank')}
+      />
+    );
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+        background: isMyMessage ? 'rgba(255,255,255,0.15)' : 'var(--bg-secondary)',
+        borderRadius: '10px', cursor: 'pointer', maxWidth: '220px'
+      }}
+      onClick={() => {
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = fileName;
+        a.click();
+      }}
+    >
+      <span style={{ fontSize: '20px' }}>{icon}</span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: '13px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isMyMessage ? 'white' : 'var(--text-primary)' }}>
+          {fileName}
+        </div>
+        <div style={{ fontSize: '11px', opacity: 0.7 }}>
+          {fileSize > 0 ? (fileSize > 1024*1024 ? (fileSize/1024/1024).toFixed(1)+' MB' : Math.round(fileSize/1024)+' KB') : ''}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const MessageList: React.FC = () => {
   const { activeChat, messages, setReplyingTo, replyingTo } = useChat();
   const { user } = useAuth();
@@ -187,78 +251,9 @@ const MessageList: React.FC = () => {
                   {/* Вложения */}
                   {message.attachments && message.attachments.length > 0 && (
                     <div style={{ marginTop: message.text ? '8px' : '0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {message.attachments.map((file: any, idx: number) => {
-                        const isFileObj = file instanceof File;
-                        const fileName = isFileObj ? file.name : (file.original_name || file.name || 'Файл');
-                        const mimeType = isFileObj ? file.type : (file.mime_type || file.type || '');
-                        const fileSize = file.size || 0;
-                        const isImage = mimeType.startsWith('image/');
-                        const icon = mimeType.includes('pdf') ? '📄'
-                          : mimeType.includes('word') || mimeType.includes('document') ? '📝'
-                          : mimeType.includes('sheet') || mimeType.includes('excel') ? '📊'
-                          : isImage ? '🖼️' : '📎';
-
-                        // Получаем URL — для File объектов используем blob только если нет серверного url
-                        const fileUrl = (!isFileObj && file.url) ? file.url : (isFileObj ? URL.createObjectURL(file) : '#');
-
-                        if (isImage) {
-                          return (
-                            <img
-                              key={idx}
-                              src={fileUrl}
-                              alt={fileName}
-                              style={{
-                                maxWidth: '240px',
-                                maxHeight: '180px',
-                                borderRadius: '8px',
-                                objectFit: 'cover',
-                                display: 'block',
-                                cursor: 'pointer'
-                              }}
-                              onClick={() => window.open(fileUrl, '_blank')}
-                            />
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={idx}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '8px 12px',
-                              background: isMyMessage ? 'rgba(255,255,255,0.15)' : 'var(--bg-secondary)',
-                              borderRadius: '10px',
-                              cursor: 'pointer',
-                              maxWidth: '220px'
-                            }}
-                            onClick={() => {
-                              const a = document.createElement('a');
-                              a.href = fileUrl;
-                              a.download = fileName;
-                              a.click();
-                            }}
-                          >
-                            <span style={{ fontSize: '20px' }}>{icon}</span>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{
-                                fontSize: '13px',
-                                fontWeight: '600',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                color: isMyMessage ? 'white' : 'var(--text-primary)'
-                              }}>
-                                {fileName}
-                              </div>
-                              <div style={{ fontSize: '11px', opacity: 0.7 }}>
-                                {fileSize > 0 ? (fileSize / 1024).toFixed(0) + ' KB' : ''}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {message.attachments.map((file: any, idx: number) => (
+                        <FileAttachment key={idx} file={file} isMyMessage={isMyMessage} />
+                      ))}
                     </div>
                   )}
 
