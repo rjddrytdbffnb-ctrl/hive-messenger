@@ -158,17 +158,30 @@ function setupSocket(server) {
       });
     });
 
-    socket.on('user_online', () => {
+    socket.on('user_online', async () => {
+      // Сообщаем всем что этот юзер онлайн
       socket.broadcast.emit('user_status_change', {
         userId: socket.userId, username: socket.user.username, status: 'online'
       });
+      // Обновляем БД
+      try { await pool.query('UPDATE users SET is_online=true WHERE id=$1', [socket.userId]); } catch {}
+      // Отправляем этому юзеру список кто уже онлайн
+      try {
+        const { rows } = await pool.query(
+          'SELECT id FROM users WHERE is_online=true AND id!=$1', [socket.userId]
+        );
+        rows.forEach(u => socket.emit('user_status_change', { userId: String(u.id), status: 'online' }));
+      } catch {}
     });
 
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => {
       console.log(`❌ Отключён: ${socket.user.username} — ${reason}`);
       socket.broadcast.emit('user_status_change', {
         userId: socket.userId, username: socket.user.username, status: 'offline'
       });
+      try {
+        await pool.query('UPDATE users SET is_online=false, last_seen=NOW() WHERE id=$1', [socket.userId]);
+      } catch {}
     });
   });
 
