@@ -67,6 +67,9 @@ const EXECUTORS: TaskUser[] = [
   { id: 'exec_4', name: 'Елена Смирнова',  avatar: 'ЕС', department: 'IT' },
 ];
 
+// Получить уникальные отделы из списка исполнителей
+const ALL_DEPARTMENTS = Array.from(new Set(EXECUTORS.map(e => e.department)));
+
 const DEPT_COLORS: Record<string, string> = {
   IT: '#6366f1', Marketing: '#ec4899', Sales: '#f59e0b', HR: '#10b981',
   Finance: '#3b82f6', Management: '#8b5cf6', Other: '#6b7280',
@@ -117,6 +120,7 @@ const TasksPage: React.FC = () => {
   const [view, setView] = useState<'my' | 'inbox'>('my');
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
   const [selectedExecutor, setSelectedExecutor] = useState<TaskUser | null>(null);
+  const [deptFilter, setDeptFilter] = useState<string>('all');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [newComment, setNewComment] = useState('');
@@ -154,6 +158,11 @@ const TasksPage: React.FC = () => {
     ...e,
     taskCount: myCreatedTasks.filter(t => t.assignedToId === e.id).length,
   }));
+
+  const filteredExecutors = deptFilter === 'all'
+    ? executorsWithTasks
+    : executorsWithTasks.filter(e => e.department === deptFilter);
+
   const filteredByExecutor = selectedExecutor
     ? myCreatedTasks.filter(t => t.assignedToId === selectedExecutor.id)
     : [];
@@ -192,6 +201,7 @@ const TasksPage: React.FC = () => {
     setView(v);
     setSelectedExecutor(null);
     setSelectedTask(null);
+    setDeptFilter('all');
     setMobileScreen('executors');
   };
 
@@ -274,12 +284,49 @@ const TasksPage: React.FC = () => {
   // ── Список исполнителей ──
   const ExecutorsList = () => (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
         <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Исполнители</span>
-        <span style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', borderRadius: '20px', padding: '1px 8px', fontSize: '11px', fontWeight: '600' }}>{EXECUTORS.length}</span>
+        <span style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', borderRadius: '20px', padding: '1px 8px', fontSize: '11px', fontWeight: '600' }}>{filteredExecutors.length}</span>
       </div>
+
+      {/* Фильтр по отделам */}
+      {ALL_DEPARTMENTS.length > 1 && (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+          <button
+            onClick={() => setDeptFilter('all')}
+            style={{
+              padding: '4px 12px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+              fontSize: '12px', fontWeight: '700', transition: 'all 0.15s',
+              background: deptFilter === 'all' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'var(--bg-primary)',
+              color: deptFilter === 'all' ? 'white' : 'var(--text-secondary)',
+              border: deptFilter === 'all' ? 'none' : '1px solid var(--border-color)',
+            }}
+          >Все</button>
+          {ALL_DEPARTMENTS.map(dept => {
+            const color = DEPT_COLORS[dept] || '#6b7280';
+            return (
+              <button
+                key={dept}
+                onClick={() => setDeptFilter(deptFilter === dept ? 'all' : dept)}
+                style={{
+                  padding: '4px 12px', borderRadius: '20px', cursor: 'pointer',
+                  fontSize: '12px', fontWeight: '700', transition: 'all 0.15s',
+                  background: deptFilter === dept ? color : 'var(--bg-primary)',
+                  color: deptFilter === dept ? 'white' : color,
+                  border: `1px solid ${color}`,
+                }}
+              >{dept}</button>
+            );
+          })}
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {executorsWithTasks.map(u => {
+        {filteredExecutors.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px 16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+            Нет сотрудников в отделе «{deptFilter}»
+          </div>
+        ) : filteredExecutors.map(u => {
           const deptColor = DEPT_COLORS[u.department] || '#6b7280';
           const isSelected = selectedExecutor?.id === u.id;
           return (
@@ -490,6 +537,7 @@ const TasksPage: React.FC = () => {
         <RequestModal
           executors={EXECUTORS}
           currentUser={{ id: myId, name: myName, avatar: myAvatar }}
+          tasks={tasks}
           onClose={() => setShowRequestModal(false)}
           onSubmit={task => { setTasksAndSync(prev => [task, ...prev]); setShowRequestModal(false); }}
         />
@@ -680,9 +728,10 @@ const TaskDetail: React.FC<{
 const RequestModal: React.FC<{
   executors: TaskUser[];
   currentUser: { id: string; name: string; avatar: string };
+  tasks: Task[];
   onClose: () => void;
   onSubmit: (task: Task) => void;
-}> = ({ executors, currentUser, onClose, onSubmit }) => {
+}> = ({ executors, currentUser, tasks, onClose, onSubmit }) => {
   const [executorId, setExecutorId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -691,6 +740,17 @@ const RequestModal: React.FC<{
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [modalDeptFilter, setModalDeptFilter] = useState<string>('all');
+
+  const modalDepts = Array.from(new Set(executors.map(e => e.department)));
+
+  const filteredModalExecutors = modalDeptFilter === 'all'
+    ? executors
+    : executors.filter(e => e.department === modalDeptFilter);
+
+  // Считаем активные задачи для каждого исполнителя
+  const getActiveTaskCount = (execId: string) =>
+    tasks.filter(t => t.assignedToId === execId && !t.isCompleted && t.status !== 'cancelled').length;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -775,16 +835,58 @@ const RequestModal: React.FC<{
             <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 {lbl('Исполнитель *')}
+                {/* Фильтр по отделам в модалке */}
+                {modalDepts.length > 1 && (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                    <button
+                      onClick={() => setModalDeptFilter('all')}
+                      style={{
+                        padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+                        fontSize: '11px', fontWeight: '700',
+                        background: modalDeptFilter === 'all' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'var(--bg-secondary)',
+                        color: modalDeptFilter === 'all' ? 'white' : 'var(--text-secondary)',
+                        border: modalDeptFilter === 'all' ? 'none' : '1px solid var(--border-color)',
+                      }}
+                    >Все</button>
+                    {modalDepts.map(dept => {
+                      const color = DEPT_COLORS[dept] || '#6b7280';
+                      return (
+                        <button
+                          key={dept}
+                          onClick={() => setModalDeptFilter(modalDeptFilter === dept ? 'all' : dept)}
+                          style={{
+                            padding: '3px 10px', borderRadius: '20px', cursor: 'pointer',
+                            fontSize: '11px', fontWeight: '700',
+                            background: modalDeptFilter === dept ? color : 'var(--bg-secondary)',
+                            color: modalDeptFilter === dept ? 'white' : color,
+                            border: `1px solid ${color}`,
+                          }}
+                        >{dept}</button>
+                      );
+                    })}
+                  </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  {executors.map(e => (
-                    <div key={e.id} onClick={() => { setExecutorId(e.id); setErrors(p => ({...p, executor: ''})); }} style={{ padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', background: executorId === e.id ? 'rgba(102,126,234,0.1)' : 'var(--bg-secondary)', border: executorId === e.id ? '2px solid #667eea' : '1.5px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '9px', transition: 'all 0.15s' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: executorId === e.id ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'var(--bg-primary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: executorId === e.id ? 'white' : 'var(--text-secondary)', fontSize: '11px', fontWeight: '800', flexShrink: 0 }}>{e.avatar}</div>
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{e.name}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{e.department}</div>
+                  {filteredModalExecutors.map(e => {
+                    const activeCount = getActiveTaskCount(e.id);
+                    const isSelected = executorId === e.id;
+                    return (
+                      <div key={e.id} onClick={() => { setExecutorId(e.id); setErrors(p => ({...p, executor: ''})); }} style={{ padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', background: isSelected ? 'rgba(102,126,234,0.1)' : 'var(--bg-secondary)', border: isSelected ? '2px solid #667eea' : '1.5px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '9px', transition: 'all 0.15s', position: 'relative' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: isSelected ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'var(--bg-primary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isSelected ? 'white' : 'var(--text-secondary)', fontSize: '11px', fontWeight: '800', flexShrink: 0 }}>{e.avatar}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                            <span>{e.department}</span>
+                            {activeCount > 0 && (
+                              <span style={{ background: activeCount >= 3 ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)', color: activeCount >= 3 ? '#ef4444' : '#f59e0b', borderRadius: '4px', padding: '0 4px', fontSize: '10px', fontWeight: '700' }}>
+                                {activeCount} зад.
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 {errors.executor && <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>⚠ {errors.executor}</div>}
               </div>
