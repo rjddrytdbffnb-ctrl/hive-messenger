@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { pushNotification } from '../context/ChatContext';
+import { usersAPI } from '../services/api';
 
 interface TaskUser {
   id: string;
@@ -60,16 +61,6 @@ const STATUS_CONFIG = {
   'cancelled':   { label: 'Отменено',  color: '#ef4444', bg: 'rgba(239,68,68,0.1)'   },
 };
 
-const EXECUTORS: TaskUser[] = [
-  { id: 'exec_1', name: 'Алексей Иванов',  avatar: 'АИ', department: 'IT' },
-  { id: 'exec_2', name: 'Мария Петрова',   avatar: 'МП', department: 'IT' },
-  { id: 'exec_3', name: 'Дмитрий Сидоров', avatar: 'ДС', department: 'IT' },
-  { id: 'exec_4', name: 'Елена Смирнова',  avatar: 'ЕС', department: 'IT' },
-];
-
-// Получить уникальные отделы из списка исполнителей
-const ALL_DEPARTMENTS = Array.from(new Set(EXECUTORS.map(e => e.department)));
-
 const DEPT_COLORS: Record<string, string> = {
   IT: '#6366f1', Marketing: '#ec4899', Sales: '#f59e0b', HR: '#10b981',
   Finance: '#3b82f6', Management: '#8b5cf6', Other: '#6b7280',
@@ -121,6 +112,26 @@ const TasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
   const [selectedExecutor, setSelectedExecutor] = useState<TaskUser | null>(null);
   const [deptFilter, setDeptFilter] = useState<string>('all');
+  const [executors, setExecutors] = useState<TaskUser[]>([]);
+
+  // Загружаем реальных пользователей с сервера
+  useEffect(() => {
+    usersAPI.getAll().then(res => {
+      const rawUsers = (res.data as any).users ?? res.data;
+      const users: TaskUser[] = (Array.isArray(rawUsers) ? rawUsers : [])
+        .filter((u: any) => u.id !== myId)
+        .map((u: any) => ({
+          id: String(u.id),
+          name: `${u.firstName ?? u.first_name ?? ''} ${u.lastName ?? u.last_name ?? ''}`.trim(),
+          avatar: `${(u.firstName ?? u.first_name ?? 'U')[0]}${(u.lastName ?? u.last_name ?? '')[0] ?? ''}`,
+          department: u.department || 'Other',
+        }));
+      setExecutors(users);
+    }).catch(() => {
+      // фоллбэк: показать пустой список, не крашиться
+      setExecutors([]);
+    });
+  }, [myId]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [newComment, setNewComment] = useState('');
@@ -154,10 +165,12 @@ const TasksPage: React.FC = () => {
   const myCreatedTasks = tasks.filter(t => t.assignedById === myId);
   const inboxTasks = tasks.filter(t => t.assignedTo === myName && t.assignedById !== myId);
 
-  const executorsWithTasks = EXECUTORS.map(e => ({
+  const executorsWithTasks = executors.map(e => ({
     ...e,
     taskCount: myCreatedTasks.filter(t => t.assignedToId === e.id).length,
   }));
+
+  const allDepartments = Array.from(new Set(executors.map(e => e.department)));
 
   const filteredExecutors = deptFilter === 'all'
     ? executorsWithTasks
@@ -289,9 +302,8 @@ const TasksPage: React.FC = () => {
         <span style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', borderRadius: '20px', padding: '1px 8px', fontSize: '11px', fontWeight: '600' }}>{filteredExecutors.length}</span>
       </div>
 
-      {/* Фильтр по отделам */}
-      {ALL_DEPARTMENTS.length > 1 && (
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+      {/* Фильтр по отделам — всегда виден */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
           <button
             onClick={() => setDeptFilter('all')}
             style={{
@@ -302,7 +314,7 @@ const TasksPage: React.FC = () => {
               border: deptFilter === 'all' ? 'none' : '1px solid var(--border-color)',
             }}
           >Все</button>
-          {ALL_DEPARTMENTS.map(dept => {
+          {allDepartments.map(dept => {
             const color = DEPT_COLORS[dept] || '#6b7280';
             return (
               <button
@@ -319,7 +331,6 @@ const TasksPage: React.FC = () => {
             );
           })}
         </div>
-      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {filteredExecutors.length === 0 ? (
@@ -535,7 +546,7 @@ const TasksPage: React.FC = () => {
 
       {showRequestModal && (
         <RequestModal
-          executors={EXECUTORS}
+          executors={executors}
           currentUser={{ id: myId, name: myName, avatar: myAvatar }}
           tasks={tasks}
           onClose={() => setShowRequestModal(false)}
@@ -835,9 +846,8 @@ const RequestModal: React.FC<{
             <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 {lbl('Исполнитель *')}
-                {/* Фильтр по отделам в модалке */}
-                {modalDepts.length > 1 && (
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                {/* Фильтр по отделам в модалке — всегда виден */}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
                     <button
                       onClick={() => setModalDeptFilter('all')}
                       style={{
@@ -865,7 +875,6 @@ const RequestModal: React.FC<{
                       );
                     })}
                   </div>
-                )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   {filteredModalExecutors.map(e => {
                     const activeCount = getActiveTaskCount(e.id);
