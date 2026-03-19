@@ -1,8 +1,12 @@
-// src/context/ChatContext.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+// src/context/ChatContext.tsx - РЕАЛЬНЫЙ API + SOCKET.IO
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { useLocation } from 'react-router-dom';
-import { getSmartBotResponse, isBot, BOTS } from '../services/chatBots';
+import { chatsAPI, messagesAPI } from '../services/api';
+import { getSmartBotResponse, isBot } from '../services/chatBots';
+import { io, Socket } from 'socket.io-client';
+
+const SOCKET_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 interface User {
   id: string;
@@ -95,284 +99,390 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-const DEFAULT_CHATS: Chat[] = [
-  {
-    id: 'bot_chat_alex',
-    name: 'Алексей Иванов (БОТ)',
-    type: 'direct',
-    avatar: 'АИ',
-    lastMessage: 'Привет! Это тестовый бот',
-    lastMessageTime: '10:30',
-    unreadCount: 0,
-    isPinned: false,
-    isArchived: false,
-    isMuted: false,
-    isOnline: true,
-    participants: [{ id: 'bot_alex', firstName: 'Алексей', lastName: 'Иванов', isOnline: true }],
-    messages: []
-  },
-  {
-    id: 'bot_chat_maria',
-    name: 'Мария Петрова (БОТ)',
-    type: 'direct',
-    avatar: 'МП',
-    lastMessage: 'Готова помочь!',
-    lastMessageTime: '09:15',
-    unreadCount: 0,
-    isPinned: false,
-    isArchived: false,
-    isMuted: false,
-    isOnline: true,
-    participants: [{ id: 'bot_maria', firstName: 'Мария', lastName: 'Петрова', isOnline: true }],
-    messages: []
-  }
-];
-
-// Загружаем чаты из localStorage, мерджим с дефолтными
-function loadChats(): Chat[] {
-  try {
-    const saved = localStorage.getItem('corp_chats');
-    if (!saved) return DEFAULT_CHATS;
-    const parsed: Chat[] = JSON.parse(saved);
-    // Добавляем дефолтные чаты если их нет в сохранённых
-    const ids = new Set(parsed.map(c => c.id));
-    const merged = [...parsed];
-    for (const def of DEFAULT_CHATS) {
-      if (!ids.has(def.id)) merged.push(def);
-    }
-    return merged;
-  } catch {
-    return DEFAULT_CHATS;
-  }
-}
-
-function loadMessages(): Message[] {
-  try {
-    const saved = localStorage.getItem('corp_messages');
-    if (!saved) return [];
-    return JSON.parse(saved);
-  } catch {
-    return [];
-  }
-}
-
-// Хелпер: добавляет уведомление в localStorage
-function pushNotification(title: string, message: string, type: string) {
+// Уведомления в localStorage
+export function pushNotification(title: string, message: string, type: string) {
   try {
     const notifs = JSON.parse(localStorage.getItem('corp_notifications') || '[]');
     const newNotif = {
-      id: Date.now(),
-      type,
-      title,
-      message,
-      related_id: null,
-      is_read: false,
+      id: Date.now(), type, title, message,
+      related_id: null, is_read: false,
       created_at: new Date().toISOString(),
     };
     localStorage.setItem('corp_notifications', JSON.stringify([newNotif, ...notifs].slice(0, 50)));
   } catch {}
 }
 
-export { pushNotification };
-function saveChats(chats: Chat[]) {
-  try {
-    const serializable = chats.map(c => ({
-      ...c,
-      messages: (c.messages || []).map(m => ({ ...m, attachments: undefined }))
-    }));
-    localStorage.setItem('corp_chats', JSON.stringify(serializable));
-  } catch {}
+// Маппинг сырого сообщения из API/сокета в Message
+function mapRawMessage(raw: any, chatId: string): Message {
+  return {
+    id: String(raw.id),
+    chatId: String(chatId),
+    sender: {
+      id: String(raw.user_id || raw.sender?.id || ''),
+      firstName: raw.first_name || raw.sender?.firstName || raw.username || '',
+      lastName: raw.last_name || raw.sender?.lastName || '',
+      isOnline: true,
+    },
+    text: raw.text || '',
+    timestamp: raw.created_at || new Date().toISOString(),
+    isRead: raw.is_read || false,
+    reactions: [],
+  };
 }
 
-function saveMessages(messages: Message[]) {
-  try {
-    const serializable = messages.map(m => ({ ...m, attachments: undefined }));
-    localStorage.setItem('corp_messages', JSON.stringify(serializable));
-  } catch {}
+// Маппинг чата из API
+function mapRawChat(raw: any): Chat {
+  const lm = raw.last_message;
+  return {
+    id: String(raw.id),
+    name: raw.name || 'Чат',
+    type: raw.type || 'direct',
+    avatar: raw.avatar || raw.name?.[0] || '?',
+    lastMessage: lm?.text || '',
+    lastMessageTime: lm?.created_at
+      ? new Date(lm.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+      : '',
+    unreadCount: raw.unread_count || 0,
+    isPinned: false,
+    isArchived: false,
+    isMuted: false,
+    isOnline: false,
+    participants: [],
+    messages: [],
+  };
 }
+
+const BOT_CHATS: Chat[] = [
+  {
+    id: 'bot_chat_alex', name: 'Алексей Иванов (БОТ)', type: 'direct', avatar: 'АИ',
+    lastMessage: 'Привет! Это тестовый бот', lastMessageTime: '10:30',
+    unreadCount: 0, isPinned: false, isArchived: false, isMuted: false, isOnline: true,
+    participants: [{ id: 'bot_alex', firstName: 'Алексей', lastName: 'Иванов', isOnline: true }],
+    messages: []
+  },
+  {
+    id: 'bot_chat_maria', name: 'Мария Петрова (БОТ)', type: 'direct', avatar: 'МП',
+    lastMessage: 'Готова помочь!', lastMessageTime: '09:15',
+    unreadCount: 0, isPinned: false, isArchived: false, isMuted: false, isOnline: true,
+    participants: [{ id: 'bot_maria', firstName: 'Мария', lastName: 'Петрова', isOnline: true }],
+    messages: []
+  }
+];
 
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const location = useLocation();
+  const socketRef = useRef<Socket | null>(null);
 
-  const [chats, setChats] = useState<Chat[]>(() => loadChats());
+  const [chats, setChats] = useState<Chat[]>(BOT_CHATS);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(() => loadMessages());
+  const [messages, setMessages] = useState<Message[]>([]);
 
-  // Сохраняем chats в localStorage при каждом изменении
+  // ── Загрузка чатов с сервера ──────────────────────────────────────────
   useEffect(() => {
-    saveChats(chats);
-  }, [chats]);
+    if (!user) return;
+    loadChatsFromAPI();
+  }, [user]);
 
-  // Сохраняем messages в localStorage при каждом изменении
+  const loadChatsFromAPI = async () => {
+    try {
+      setLoading(true);
+      const response = await chatsAPI.getAll();
+      const serverChats = response.data.chats.map(mapRawChat);
+      setChats([...BOT_CHATS, ...serverChats]);
+    } catch (err) {
+      console.error('Ошибка загрузки чатов:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Загрузка сообщений при смене активного чата ───────────────────────
   useEffect(() => {
-    saveMessages(messages);
-  }, [messages]);
+    if (!activeChat) return;
+    if (activeChat.id.startsWith('bot_')) return; // боты — локально
 
+    const loadMessages = async () => {
+      try {
+        const response = await messagesAPI.getByChat(activeChat.id);
+        const mapped = response.data.messages.map((m: any) => mapRawMessage(m, activeChat.id));
+        setMessages(prev => {
+          // Удаляем старые сообщения этого чата, добавляем новые
+          const other = prev.filter(m => m.chatId !== activeChat.id);
+          return [...other, ...mapped];
+        });
+      } catch (err) {
+        console.error('Ошибка загрузки сообщений:', err);
+      }
+    };
+    loadMessages();
+  }, [activeChat?.id]);
+
+  // ── Socket.io ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('🔌 Socket подключён');
+      socket.emit('join_chats');
+      socket.emit('join_user_room');
+      socket.emit('user_online');
+    });
+
+    socket.on('new_message', ({ message, user: sender }: any) => {
+      const chatId = String(message.chat_id);
+      const newMsg: Message = {
+        id: String(message.id),
+        chatId,
+        sender: {
+          id: String(message.user_id),
+          firstName: sender?.username || message.username || '',
+          lastName: '',
+          isOnline: true,
+        },
+        text: message.text || '',
+        timestamp: message.created_at || new Date().toISOString(),
+        isRead: false,
+        reactions: [],
+      };
+
+      setMessages(prev => {
+        // Не дублируем если уже есть
+        if (prev.some(m => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+
+      setChats(prev => prev.map(c =>
+        c.id === chatId
+          ? {
+              ...c,
+              lastMessage: message.text || '',
+              lastMessageTime: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+              unreadCount: c.id !== activeChat?.id ? (c.unreadCount || 0) + 1 : c.unreadCount,
+            }
+          : c
+      ));
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('❌ Socket отключён:', reason);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Socket ошибка:', err.message);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [user]);
+
+  // Подключаемся к комнате нового активного чата
+  useEffect(() => {
+    if (!activeChat || activeChat.id.startsWith('bot_')) return;
+    socketRef.current?.emit('join_chat', activeChat.id);
+  }, [activeChat?.id]);
+
+  // ── Навигация из EmployeesPage ────────────────────────────────────────
   useEffect(() => {
     const state = location.state as any;
-    if (state?.startChatWith) {
-      const emp = state.startChatWith;
-      const existing = chats.find(c => c.type === 'direct' && c.participants?.some(p => p.id === emp.id));
-      if (existing) {
-        setActiveChat(existing);
-      } else {
-        const newChat: Chat = {
-          id: `chat_${Date.now()}`,
-          name: `${emp.firstName} ${emp.lastName}`,
-          type: 'direct',
-          avatar: emp.avatar || `${emp.firstName[0]}${emp.lastName[0]}`,
-          lastMessage: 'Начните общение...',
-          lastMessageTime: 'Сейчас',
-          unreadCount: 0,
-          isPinned: false,
-          isArchived: false,
-          isMuted: false,
-          participants: [emp],
-          messages: []
-        };
-        setChats(prev => [newChat, ...prev]);
-        setActiveChat(newChat);
-      }
-      window.history.replaceState({}, document.title);
-    }
+    if (!state?.startChatWith) return;
+    const emp = state.startChatWith;
+    createOrOpenChat(emp);
+    window.history.replaceState({}, document.title);
   }, [location.state]);
 
-  useEffect(() => {
-    if (activeChat) {
-      // Берём сообщения из общего стейта (там актуальные)
-      setMessages(prev => prev); // просто триггер для отображения
-    }
-  }, [activeChat]);
-
+  // ── Отправка сообщения ─────────────────────────────────────────────────
   const sendMessage = (text: string, files?: File[]) => {
     if (!activeChat) return;
 
-    const mediaFiles: MediaFile[] = (files || []).map((f, i) => {
-      const ext = f.name.split('.').pop()?.toLowerCase() || '';
-      const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
-      const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext);
-      return {
-        id: `${Date.now()}_${i}`,
-        name: f.name,
-        url: URL.createObjectURL(f),
-        size: f.size > 1024 * 1024 ? (f.size / 1024 / 1024).toFixed(1) + ' MB' : (f.size / 1024).toFixed(0) + ' KB',
-        type: isImage ? 'image' : isVideo ? 'video' : 'file',
-        chatName: activeChat.name,
-        sender: user ? `${user.firstName} ${user.lastName}` : 'Вы',
-        date: new Date().toLocaleDateString('ru-RU'),
+    // Боты — локально
+    if (activeChat.id.startsWith('bot_')) {
+      const botMsg: Message = {
+        id: Date.now().toString(),
+        chatId: activeChat.id,
+        sender: { id: user?.id || '1', firstName: user?.firstName || 'Вы', lastName: user?.lastName || '', isOnline: true },
+        text: text.trim(),
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        reactions: [],
       };
-    });
+      setMessages(prev => [...prev, botMsg]);
+      setTimeout(() => {
+        const botId = activeChat.participants?.[0]?.id || 'bot';
+        const reply = getSmartBotResponse(botId, text, user ? `${user.firstName} ${user.lastName}` : 'Пользователь');
+        const replyMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          chatId: activeChat.id,
+          sender: activeChat.participants?.[0] || { id: 'bot', firstName: 'Бот', lastName: '', isOnline: true },
+          text: reply,
+          timestamp: new Date().toISOString(),
+          isRead: false,
+          reactions: [],
+        };
+        setMessages(prev => [...prev, replyMsg]);
+      }, 800);
+      return;
+    }
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      chatId: activeChat.id,
-      sender: { id: user?.id || '1', firstName: user?.firstName || 'Вы', lastName: user?.lastName || '', isOnline: true },
-      text: text.trim(),
-      timestamp: new Date().toISOString(),
-      isRead: false,
-      attachments: files,
-      mediaFiles: mediaFiles.length > 0 ? mediaFiles : undefined,
-      reactions: []
-    };
-    setMessages(prev => [...prev, newMessage]);
-    const lastMsg = text.trim() || (files && files.length > 0 ? `📎 ${files[0].name}` : '');
-    setChats(prev => prev.map(c => c.id === activeChat.id
-      ? { ...c, messages: [...(c.messages || []), newMessage], lastMessage: lastMsg, lastMessageTime: 'Сейчас' }
-      : c
-    ));
-    // Уведомление о новом сообщении
-    const senderName = user ? `${user.firstName} ${user.lastName}` : 'Вы';
-    pushNotification(
-      `Новое сообщение в «${activeChat.name}»`,
-      text.trim() || (files ? `📎 ${files[0]?.name}` : ''),
-      'message'
-    );
+    // Реальный чат — через сокет
+    if (socketRef.current?.connected) {
+      // Оптимистично добавляем сообщение сразу
+      const tempId = `temp_${Date.now()}`;
+      const optimistic: Message = {
+        id: tempId,
+        chatId: activeChat.id,
+        sender: { id: user?.id || '', firstName: user?.firstName || '', lastName: user?.lastName || '', isOnline: true },
+        text: text.trim(),
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        reactions: [],
+      };
+      setMessages(prev => [...prev, optimistic]);
+      setChats(prev => prev.map(c =>
+        c.id === activeChat.id
+          ? { ...c, lastMessage: text.trim(), lastMessageTime: 'Сейчас' }
+          : c
+      ));
+
+      socketRef.current.emit('send_message', {
+        chatId: activeChat.id,
+        text: text.trim(),
+      });
+    } else {
+      // Fallback: HTTP запрос если сокет не подключён
+      messagesAPI.send(activeChat.id, text.trim()).then(response => {
+        const saved = mapRawMessage(response.data.message, activeChat.id);
+        setMessages(prev => [...prev, saved]);
+      }).catch(err => console.error('Ошибка отправки:', err));
+    }
   };
 
-  const markAsRead = (id: string) => setChats(p => p.map(c => c.id === id ? {...c, unreadCount: 0} : c));
-  const pinChat = (id: string) => setChats(p => p.map(c => c.id === id ? {...c, isPinned: true} : c));
-  const unpinChat = (id: string) => setChats(p => p.map(c => c.id === id ? {...c, isPinned: false} : c));
-  const archiveChat = (id: string) => setChats(p => p.map(c => c.id === id ? {...c, isArchived: true} : c));
-  const unarchiveChat = (id: string) => setChats(p => p.map(c => c.id === id ? {...c, isArchived: false} : c));
-  const muteChat = (id: string) => setChats(p => p.map(c => c.id === id ? {...c, isMuted: true} : c));
-  const unmuteChat = (id: string) => setChats(p => p.map(c => c.id === id ? {...c, isMuted: false} : c));
+  // ── Создать или открыть чат ───────────────────────────────────────────
+  const createOrOpenChat = (employee: any): string => {
+    const empId = String(employee.id);
 
+    // Ищем существующий чат
+    const existing = chats.find(c =>
+      c.type === 'direct' && c.participants?.some(p => String(p.id) === empId)
+    );
+    if (existing) {
+      setActiveChat(existing);
+      return existing.id;
+    }
+
+    // Создаём через API
+    chatsAPI.createDirect(empId).then(response => {
+      const newChat = mapRawChat(response.data.chat);
+      newChat.participants = [employee];
+      setChats(prev => [newChat, ...prev.filter(c => !c.id.startsWith('bot_')), ...BOT_CHATS]);
+      setActiveChat(newChat);
+      socketRef.current?.emit('join_chat', newChat.id);
+    }).catch(() => {
+      // Fallback: локальный чат
+      const localChat: Chat = {
+        id: `local_${Date.now()}`,
+        name: `${employee.firstName} ${employee.lastName}`,
+        type: 'direct',
+        avatar: employee.avatar || `${employee.firstName[0]}${employee.lastName[0]}`,
+        lastMessage: 'Начните общение...',
+        lastMessageTime: '',
+        unreadCount: 0,
+        isPinned: false, isArchived: false, isMuted: false,
+        participants: [employee],
+        messages: [],
+      };
+      setChats(prev => [localChat, ...prev]);
+      setActiveChat(localChat);
+    });
+
+    return '';
+  };
+
+  const createGroupChat = (name: string, participants: User[]): string => {
+    const ids = participants.map(p => p.id);
+    chatsAPI.create(name, 'group', ids).then(response => {
+      const newChat = mapRawChat(response.data.chat);
+      newChat.participants = participants;
+      setChats(prev => [newChat, ...prev]);
+      setActiveChat(newChat);
+    }).catch(console.error);
+    return '';
+  };
+
+  const markAsRead = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, unreadCount: 0 } : c));
+  const pinChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isPinned: true } : c));
+  const unpinChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isPinned: false } : c));
+  const archiveChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isArchived: true } : c));
+  const unarchiveChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isArchived: false } : c));
+  const muteChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isMuted: true } : c));
+  const unmuteChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isMuted: false } : c));
   const deleteChat = (id: string) => {
     setChats(p => p.filter(c => c.id !== id));
     setMessages(p => p.filter(m => m.chatId !== id));
     if (activeChat?.id === id) setActiveChat(null);
   };
 
-  const addReaction = (id: string, emoji: string) => {};
-  const removeReaction = (id: string, emoji: string) => {};
-  const deleteMessage = (id: string) => {};
-  const editMessage = (id: string, text: string) => {};
-  const forwardMessage = (id: string, ids: string[]) => {};
-
-  const createOrOpenChat = (employee: any): string => {
-    const existing = chats.find(c => c.type === 'direct' && c.participants?.some(p => p.id === employee.id));
-    if (existing) {
-      setActiveChat(existing);
-      return existing.id;
-    }
-    const newChat: Chat = {
-      id: `chat_${Date.now()}`,
-      name: `${employee.firstName} ${employee.lastName}`,
-      type: 'direct',
-      avatar: employee.avatar || `${employee.firstName[0]}${employee.lastName[0]}`,
-      lastMessage: 'Начните общение...',
-      lastMessageTime: 'Сейчас',
-      unreadCount: 0,
-      isPinned: false,
-      isArchived: false,
-      isMuted: false,
-      isOnline: employee.isOnline || false,
-      participants: [employee],
-      messages: []
-    };
-    setChats(prev => [newChat, ...prev]);
-    setActiveChat(newChat);
-    return newChat.id;
+  const addReaction = (messageId: string, emoji: string) => {
+    setMessages(prev => prev.map(m =>
+      m.id === messageId
+        ? { ...m, reactions: [...(m.reactions || []), { emoji, userId: user?.id || '', userName: user?.firstName || '' }] }
+        : m
+    ));
+    socketRef.current?.emit('add_reaction', { messageId, emoji });
   };
 
-  const createGroupChat = (name: string, participants: User[]): string => {
-    const newChat: Chat = {
-      id: `group_${Date.now()}`,
-      name,
-      type: 'group',
-      avatar: '👥',
-      lastMessage: `Группа "${name}" создана`,
-      lastMessageTime: 'Сейчас',
-      unreadCount: 0,
-      isPinned: false,
-      isArchived: false,
-      isMuted: false,
-      participants,
-      messages: []
-    };
-    setChats(prev => [newChat, ...prev]);
-    setActiveChat(newChat);
-    return newChat.id;
+  const removeReaction = (messageId: string, emoji: string) => {
+    setMessages(prev => prev.map(m =>
+      m.id === messageId
+        ? { ...m, reactions: (m.reactions || []).filter(r => !(r.emoji === emoji && r.userId === user?.id)) }
+        : m
+    ));
+    socketRef.current?.emit('remove_reaction', { messageId, emoji });
   };
 
-  // Фильтруем сообщения по активному чату
-  const activeChatMessages = activeChat
-    ? messages.filter(m => m.chatId === activeChat.id)
-    : messages;
+  const deleteMessage = (messageId: string) =>
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isDeleted: true, text: 'Сообщение удалено' } : m));
+
+  const editMessage = (messageId: string, newText: string) =>
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m));
+
+  const forwardMessage = (messageId: string, chatIds: string[]) => {
+    const original = messages.find(m => m.id === messageId);
+    if (!original) return;
+    chatIds.forEach(chatId => {
+      const fwd: Message = { ...original, id: `fwd_${Date.now()}`, chatId, timestamp: new Date().toISOString() };
+      setMessages(prev => [...prev, fwd]);
+    });
+  };
 
   return (
     <ChatContext.Provider value={{
-      chats, activeChat, setActiveChat, sendMessage, replyingTo, setReplyingTo,
-      isTyping, setIsTyping, markAsRead, searchQuery, setSearchQuery, filterType,
-      setFilterType, pinChat, unpinChat, archiveChat, unarchiveChat, loading,
-      messages: activeChatMessages, addReaction, removeReaction, deleteMessage, editMessage,
-      forwardMessage, createOrOpenChat, createGroupChat, muteChat, unmuteChat, deleteChat
+      chats, activeChat, setActiveChat, sendMessage,
+      replyingTo, setReplyingTo, isTyping, setIsTyping,
+      markAsRead, searchQuery, setSearchQuery, filterType, setFilterType,
+      pinChat, unpinChat, archiveChat, unarchiveChat,
+      loading, messages,
+      addReaction, removeReaction, deleteMessage, editMessage, forwardMessage,
+      createOrOpenChat, createGroupChat, muteChat, unmuteChat, deleteChat,
     }}>
       {children}
     </ChatContext.Provider>
