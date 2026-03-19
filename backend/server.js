@@ -775,17 +775,45 @@ app.post('/api/media', authenticateToken, upload.single('file'), async (req, res
 
 app.get('/api/media', authenticateToken, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT f.id, f.original_name as name, f.mime_type, f.size, f.url, f.created_at,
-              u.first_name, u.last_name
-       FROM files f
-       LEFT JOIN messages m ON m.id = f.message_id
-       LEFT JOIN users u ON u.id = m.sender_id
-       WHERE f.message_id IS NULL OR f.message_id IS NOT NULL
-       ORDER BY f.created_at DESC
-       LIMIT 200`
-    );
-    res.json({ files: rows });
+    // Файлы из чатов
+    const chatFiles = await pool.query(`
+      SELECT f.id, f.original_name as name, f.mime_type, f.size, f.url, f.created_at,
+             u.first_name, u.last_name, 'chat' as source
+      FROM files f
+      JOIN messages m ON m.id = f.message_id
+      JOIN users u ON u.id = m.sender_id
+      JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = $1
+      ORDER BY f.created_at DESC
+      LIMIT 100
+    `, [req.user.id]);
+
+    // Файлы из задач
+    const taskFiles = await pool.query(`
+      SELECT tf.id, tf.original_name as name, tf.mime_type, tf.size, tf.url, tf.created_at,
+             u.first_name, u.last_name, 'task' as source
+      FROM task_files tf
+      JOIN tasks t ON t.id = tf.task_id
+      JOIN users u ON u.id = tf.uploaded_by
+      WHERE t.assigned_to = $1 OR t.created_by = $1
+      ORDER BY tf.created_at DESC
+      LIMIT 100
+    `, [req.user.id]);
+
+    // Ручные загрузки (message_id IS NULL)
+    const manualFiles = await pool.query(`
+      SELECT f.id, f.original_name as name, f.mime_type, f.size, f.url, f.created_at,
+             NULL as first_name, NULL as last_name, 'manual' as source
+      FROM files f
+      WHERE f.message_id IS NULL
+      ORDER BY f.created_at DESC
+      LIMIT 100
+    `);
+
+    const all = [...manualFiles.rows, ...chatFiles.rows, ...taskFiles.rows]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 200);
+
+    res.json({ files: all });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
   }
