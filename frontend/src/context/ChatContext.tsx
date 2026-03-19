@@ -69,7 +69,7 @@ interface ChatContextType {
   chats: Chat[];
   activeChat: Chat | null;
   setActiveChat: (chat: Chat | null) => void;
-  sendMessage: (text: string, files?: File[]) => void;
+  sendMessage: (text: string, files?: any[]) => void;
   replyingTo: Message | null;
   setReplyingTo: (message: Message | null) => void;
   isTyping: boolean;
@@ -372,7 +372,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [location.state]);
 
   // ── Отправка сообщения ─────────────────────────────────────────────────
-  const sendMessage = (text: string, files?: File[]) => {
+  const sendMessage = (text: string, files?: any[]) => {
     if (!activeChat) return;
 
     // Боты — локально
@@ -424,7 +424,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       timestamp: new Date().toISOString(),
       isRead: false,
       reactions: [],
-      attachments: files && files.length > 0 ? files : undefined,
+      attachments: files && files.length > 0 ? files.map((f: any) => {
+        if (f instanceof File) return f;
+        // GalleryFile — уже имеет url
+        return { url: f.url, original_name: f.name, name: f.name, mime_type: f.type === 'image' ? 'image/jpeg' : 'application/octet-stream', type: f.type === 'image' ? 'image/jpeg' : 'application/octet-stream', size: f.size || 0 };
+      }) : undefined,
     };
     setMessages(prev => [...prev, optimisticMsg]);
     setChats(prev => prev.map(c =>
@@ -438,8 +442,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ? (() => {
           const formData = new FormData();
           if (text.trim()) formData.append('text', text.trim());
-          else formData.append('text', ' '); // бэкенд требует непустой text
-          files.forEach(f => formData.append('files', f));
+          else formData.append('text', ' ');
+          // Добавляем только реальные File объекты
+          files.forEach(f => { if (f instanceof File) formData.append('files', f); });
+          // GalleryFile с url — добавляем как JSON
+          const galleryFiles = files.filter(f => !(f instanceof File) && f.url);
+          if (galleryFiles.length > 0) formData.append('gallery_files', JSON.stringify(galleryFiles));
           return messagesAPI.sendWithFile(currentChatId, formData);
         })()
       : messagesAPI.send(currentChatId, text.trim());
