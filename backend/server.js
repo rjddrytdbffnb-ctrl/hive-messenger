@@ -10,11 +10,34 @@ const { authenticateToken, generateToken, hashPassword, checkPassword } = requir
 const { setupSocket } = require('./socketHandler');
 const { NotificationService } = require('./notificationService');
 
+const multer = require('multer');
+const fs     = require('fs');
+
+const multer = require('multer');
 const app    = express();
 const PORT   = process.env.PORT || 3000;
 const server = http.createServer(app);
 const io     = setupSocket(server);
 app.set('io', io);
+
+// Multer — хранение файлов в памяти (для Railway без диска)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
+// Загрузка файлов — храним в /tmp/uploads на Railway
+const uploadDir = process.env.UPLOAD_DIR || '/tmp/uploads';
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, Date.now() + '_' + safe);
+  }
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
@@ -431,6 +454,66 @@ app.post('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
   }
 });
 
+// Загрузка файлов с сообщением
+app.post('/api/chats/:chatId/messages/upload', authenticateToken, upload.array('files', 10), async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const text = req.body.text?.trim() || '';
+
+    const member = await pool.query(
+      'SELECT id FROM chat_members WHERE chat_id= AND user_id=',
+      [chatId, req.user.id]
+    );
+    if (!member.rows.length)
+      return res.status(403).json({ error: 'Вы не участник этого чата' });
+
+    // Сохраняем сообщение (text может быть пустым если только файлы)
+    const ins = await pool.query(
+      'INSERT INTO messages (chat_id, sender_id, text) VALUES (,,) RETURNING *',
+      [chatId, req.user.id, text || ' ']
+    );
+    const msgId = ins.rows[0].id;
+
+    // Сохраняем файлы
+    const files = req.files || [];
+    for (const file of files) {
+      // В Railway нет постоянного хранилища — сохраняем путь как URL
+      // В продакшене стоит использовать S3/Cloudinary
+      const url = '/uploads/' + file.filename;
+      await pool.query(
+        'INSERT INTO files (message_id, filename, original_name, mime_type, size, url) VALUES (,,,,,)',
+        [msgId, file.filename, file.originalname, file.mimetype, file.size, url]
+      );
+    }
+
+    await pool.query('UPDATE chats SET updated_at=NOW() WHERE id=', [chatId]);
+
+    const { rows } = await pool.query(`
+      SELECT m.*,
+        json_build_object(
+          'id', u.id, 'username', u.username,
+          'first_name', u.first_name, 'last_name', u.last_name,
+          'avatar', u.avatar, 'is_online', u.is_online
+        ) AS sender,
+        (SELECT json_agg(json_build_object(
+          'id', f.id, 'url', f.url, 'name', f.original_name,
+          'type', CASE WHEN f.mime_type LIKE 'image/%' THEN 'image' ELSE 'file' END,
+          'size', f.size, 'mime_type', f.mime_type
+        )) FROM files f WHERE f.message_id = m.id) AS attachments
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.id=$1
+    `, [msgId]);
+
+    const message = rows[0];
+    io.to(`chat_${chatId}`).emit('new_message', { message });
+    res.status(201).json({ message });
+  } catch (err) {
+    console.error('Ошибка загрузки файла:', err);
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
+
 app.get('/api/chats/:chatId/search', authenticateToken, async (req, res) => {
   try {
     const { query } = req.query;
@@ -447,6 +530,65 @@ app.get('/api/chats/:chatId/search', authenticateToken, async (req, res) => {
 
     res.json({ results: rows, query });
   } catch (err) {
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
+
+// ============================================================
+// UPLOAD — загрузка файлов с сообщением
+// ============================================================
+
+app.post('/api/chats/:chatId/messages/upload', authenticateToken, upload.array('files', 10), async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const text = req.body.text?.trim() || '📎 Файл';
+    const uploadedFiles = req.files || [];
+
+    const member = await pool.query(
+      'SELECT id FROM chat_members WHERE chat_id=$1 AND user_id=$2',
+      [chatId, req.user.id]
+    );
+    if (!member.rows.length)
+      return res.status(403).json({ error: 'Вы не участник этого чата' });
+
+    const ins = await pool.query(
+      'INSERT INTO messages (chat_id, sender_id, text) VALUES ($1,$2,$3) RETURNING *',
+      [chatId, req.user.id, text]
+    );
+
+    await pool.query('UPDATE chats SET updated_at=NOW() WHERE id=$1', [chatId]);
+
+    // Сохраняем файлы в БД как ссылки (base64 data URL для Railway без диска)
+    const savedFiles = [];
+    for (const file of uploadedFiles) {
+      const base64 = file.buffer.toString('base64');
+      const dataUrl = `data:${file.mimetype};base64,${base64}`;
+      const { rows: frows } = await pool.query(
+        `INSERT INTO files (message_id, filename, original_name, mime_type, size, url)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [ins.rows[0].id, file.originalname, file.originalname, file.mimetype, file.size, dataUrl]
+      );
+      savedFiles.push(frows[0]);
+    }
+
+    const { rows } = await pool.query(`
+      SELECT m.*,
+        json_build_object(
+          'id', u.id, 'username', u.username,
+          'first_name', u.first_name, 'last_name', u.last_name,
+          'avatar', u.avatar, 'is_online', u.is_online
+        ) AS sender
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.id=$1
+    `, [ins.rows[0].id]);
+
+    const message = { ...rows[0], attachments: savedFiles };
+    io.to(`chat_${chatId}`).emit('new_message', { message });
+
+    res.status(201).json({ message });
+  } catch (err) {
+    console.error('Ошибка загрузки файла:', err);
     res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
   }
 });
