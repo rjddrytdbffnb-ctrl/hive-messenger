@@ -1,4 +1,4 @@
-// src/pages/TasksPage.tsx
+// src/pages/TasksPage.tsx - АДАПТИВНАЯ ВЕРСИЯ
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { pushNotification } from '../context/ChatContext';
@@ -113,12 +113,21 @@ const TasksPage: React.FC = () => {
   const myAvatar = user ? `${user.firstName[0]}${user.lastName[0]}` : 'ВЫ';
   const myId = user?.id || '1';
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [view, setView] = useState<'my' | 'inbox'>('my');
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
   const [selectedExecutor, setSelectedExecutor] = useState<TaskUser | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [newComment, setNewComment] = useState('');
+  // Для мобильного: какой "экран" показывать: executors | tasks | detail
+  const [mobileScreen, setMobileScreen] = useState<'executors' | 'tasks' | 'detail'>('executors');
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => { saveTasks(tasks); }, [tasks]);
 
@@ -171,6 +180,7 @@ const TasksPage: React.FC = () => {
     if (!selectedTask || !window.confirm('Удалить заявку?')) return;
     setTasksAndSync(prev => prev.filter(t => t.id !== selectedTask.id));
     setSelectedTask(null);
+    if (isMobile) setMobileScreen('tasks');
   };
 
   const handleDeleteFile = (fileId: string) => {
@@ -182,232 +192,298 @@ const TasksPage: React.FC = () => {
     setView(v);
     setSelectedExecutor(null);
     setSelectedTask(null);
+    setMobileScreen('executors');
   };
 
-  return (
-    <div style={{ minHeight: 'calc(100vh - 70px)', background: 'var(--bg-secondary)', padding: '32px 0' }}>
-      <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 24px' }}>
+  const handleExecutorSelect = (u: typeof executorsWithTasks[0], isSelected: boolean) => {
+    setSelectedExecutor(isSelected ? null : u);
+    setSelectedTask(null);
+    if (isMobile && !isSelected) setMobileScreen('tasks');
+  };
 
-        {/* ЗАГОЛОВОК */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-          <div>
-            <h1 style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px', letterSpacing: '-0.5px' }}>
-              ✅ Задачи
-            </h1>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
-              {view === 'my' ? 'Выберите исполнителя, чтобы увидеть его задачи' : `Входящие заявки назначенные вам — ${inboxTasks.length}`}
-            </p>
-          </div>
+  const handleTaskSelect = (task: Task, isSelected: boolean) => {
+    setSelectedTask(isSelected ? null : task);
+    if (isMobile && !isSelected) setMobileScreen('detail');
+  };
 
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            {/* Переключатель вид */}
-            <div style={{ display: 'flex', background: 'var(--bg-primary)', borderRadius: '12px', padding: '4px', border: '1px solid var(--border-color)', gap: '2px' }}>
-              <button
-                onClick={() => switchView('my')}
-                style={{
-                  padding: '8px 18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
-                  fontSize: '13px', fontWeight: '700', transition: 'all 0.2s',
-                  background: view === 'my' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'transparent',
-                  color: view === 'my' ? 'white' : 'var(--text-secondary)',
-                  boxShadow: view === 'my' ? '0 2px 8px rgba(102,126,234,0.35)' : 'none',
-                }}
-              >
-                📋 Мои заявки
-              </button>
-              <button
-                onClick={() => switchView('inbox')}
-                style={{
-                  padding: '8px 18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
-                  fontSize: '13px', fontWeight: '700', transition: 'all 0.2s', position: 'relative',
-                  background: view === 'inbox' ? 'linear-gradient(135deg, #11998e, #38ef7d)' : 'transparent',
-                  color: view === 'inbox' ? 'white' : 'var(--text-secondary)',
-                  boxShadow: view === 'inbox' ? '0 2px 8px rgba(17,153,142,0.35)' : 'none',
-                }}
-              >
-                📥 Входящие
-                {inboxTasks.length > 0 && (
-                  <span style={{
-                    position: 'absolute', top: '4px', right: '4px',
-                    background: '#ef4444', color: 'white', borderRadius: '10px',
-                    padding: '1px 5px', fontSize: '10px', fontWeight: '800',
-                    minWidth: '16px', textAlign: 'center', lineHeight: '14px'
-                  }}>{inboxTasks.length}</span>
-                )}
-              </button>
-            </div>
+  // ── Заголовок ──
+  const Header = () => (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center',
+      marginBottom: '20px', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '0'
+    }}>
+      <div>
+        <h1 style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px', letterSpacing: '-0.5px' }}>
+          ✅ Задачи
+        </h1>
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
+          {view === 'my' ? 'Выберите исполнителя, чтобы увидеть его задачи' : `Входящие заявки назначенные вам — ${inboxTasks.length}`}
+        </p>
+      </div>
 
-            <button
-              onClick={() => setShowRequestModal(true)}
-              style={{
-                padding: '10px 22px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white', border: 'none', borderRadius: '12px',
-                fontSize: '14px', fontWeight: '700', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '8px',
-                boxShadow: '0 4px 12px rgba(102,126,234,0.35)', transition: 'all 0.2s'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              <span>📝</span> Создать заявку
-            </button>
-          </div>
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', background: 'var(--bg-primary)', borderRadius: '12px', padding: '4px', border: '1px solid var(--border-color)', gap: '2px' }}>
+          <button
+            onClick={() => switchView('my')}
+            style={{
+              padding: isMobile ? '8px 12px' : '8px 18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '700', transition: 'all 0.2s',
+              background: view === 'my' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'transparent',
+              color: view === 'my' ? 'white' : 'var(--text-secondary)',
+              boxShadow: view === 'my' ? '0 2px 8px rgba(102,126,234,0.35)' : 'none',
+            }}
+          >
+            {isMobile ? '📋' : '📋 Мои заявки'}
+          </button>
+          <button
+            onClick={() => switchView('inbox')}
+            style={{
+              padding: isMobile ? '8px 12px' : '8px 18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '700', transition: 'all 0.2s', position: 'relative',
+              background: view === 'inbox' ? 'linear-gradient(135deg, #11998e, #38ef7d)' : 'transparent',
+              color: view === 'inbox' ? 'white' : 'var(--text-secondary)',
+              boxShadow: view === 'inbox' ? '0 2px 8px rgba(17,153,142,0.35)' : 'none',
+            }}
+          >
+            {isMobile ? '📥' : '📥 Входящие'}
+            {inboxTasks.length > 0 && (
+              <span style={{ position: 'absolute', top: '4px', right: '4px', background: '#ef4444', color: 'white', borderRadius: '10px', padding: '1px 5px', fontSize: '10px', fontWeight: '800', minWidth: '16px', textAlign: 'center', lineHeight: '14px' }}>{inboxTasks.length}</span>
+            )}
+          </button>
         </div>
 
-        {/* КОЛОНКИ */}
-        {view === 'my' ? (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: selectedTask
-              ? '280px 360px 1fr'
-              : selectedExecutor ? '280px 1fr' : '280px 1fr',
-            gap: '20px',
-            alignItems: 'start'
-          }}>
-            {/* Колонка исполнителей */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Исполнители</span>
-                <span style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', borderRadius: '20px', padding: '1px 8px', fontSize: '11px', fontWeight: '600' }}>
-                  {EXECUTORS.length}
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {executorsWithTasks.map(u => {
-                  const deptColor = DEPT_COLORS[u.department] || '#6b7280';
-                  const isSelected = selectedExecutor?.id === u.id;
-                  return (
-                    <div
-                      key={u.id}
-                      onClick={() => { setSelectedExecutor(isSelected ? null : u); setSelectedTask(null); }}
-                      style={{
-                        padding: '14px 16px', borderRadius: '14px', cursor: 'pointer',
-                        background: isSelected ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'var(--bg-primary)',
-                        border: isSelected ? 'none' : '1px solid var(--border-color)',
-                        boxShadow: isSelected ? '0 8px 24px rgba(102,126,234,0.35)' : '0 1px 4px rgba(0,0,0,0.04)',
-                        transition: 'all 0.2s', transform: isSelected ? 'scale(1.01)' : 'scale(1)'
-                      }}
-                      onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(-1px)'; } }}
-                      onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(0)'; } }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '42px', height: '42px', borderRadius: '12px', flexShrink: 0,
-                          background: isSelected ? 'rgba(255,255,255,0.25)' : `${deptColor}20`,
-                          border: isSelected ? '2px solid rgba(255,255,255,0.3)' : `2px solid ${deptColor}40`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: isSelected ? 'white' : deptColor, fontWeight: '800', fontSize: '13px'
-                        }}>{u.avatar}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: '700', fontSize: '14px', color: isSelected ? 'white' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
-                          <div style={{ fontSize: '12px', color: isSelected ? 'rgba(255,255,255,0.75)' : 'var(--text-secondary)', marginTop: '1px' }}>{u.department}</div>
-                        </div>
-                        <div style={{
-                          minWidth: '26px', height: '26px', borderRadius: '8px',
-                          background: isSelected ? 'rgba(255,255,255,0.2)' : `${deptColor}15`,
-                          color: isSelected ? 'white' : deptColor,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '12px', fontWeight: '800'
-                        }}>{u.taskCount}</div>
-                      </div>
-                    </div>
-                  );
-                })}
+        <button
+          onClick={() => setShowRequestModal(true)}
+          style={{
+            padding: isMobile ? '10px 14px' : '10px 22px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white', border: 'none', borderRadius: '12px',
+            fontSize: '14px', fontWeight: '700', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            boxShadow: '0 4px 12px rgba(102,126,234,0.35)', transition: 'all 0.2s'
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
+        >
+          <span>📝</span> {isMobile ? '' : 'Создать заявку'}
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Список исполнителей ──
+  const ExecutorsList = () => (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+        <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Исполнители</span>
+        <span style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', borderRadius: '20px', padding: '1px 8px', fontSize: '11px', fontWeight: '600' }}>{EXECUTORS.length}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {executorsWithTasks.map(u => {
+          const deptColor = DEPT_COLORS[u.department] || '#6b7280';
+          const isSelected = selectedExecutor?.id === u.id;
+          return (
+            <div
+              key={u.id}
+              onClick={() => handleExecutorSelect(u, isSelected)}
+              style={{
+                padding: '14px 16px', borderRadius: '14px', cursor: 'pointer',
+                background: isSelected ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'var(--bg-primary)',
+                border: isSelected ? 'none' : '1px solid var(--border-color)',
+                boxShadow: isSelected ? '0 8px 24px rgba(102,126,234,0.35)' : '0 1px 4px rgba(0,0,0,0.04)',
+                transition: 'all 0.2s', transform: isSelected ? 'scale(1.01)' : 'scale(1)'
+              }}
+              onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+              onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(0)'; } }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '42px', height: '42px', borderRadius: '12px', flexShrink: 0,
+                  background: isSelected ? 'rgba(255,255,255,0.25)' : `${deptColor}20`,
+                  border: isSelected ? '2px solid rgba(255,255,255,0.3)' : `2px solid ${deptColor}40`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: isSelected ? 'white' : deptColor, fontWeight: '800', fontSize: '13px'
+                }}>{u.avatar}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: isSelected ? 'white' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
+                  <div style={{ fontSize: '12px', color: isSelected ? 'rgba(255,255,255,0.75)' : 'var(--text-secondary)', marginTop: '1px' }}>{u.department}</div>
+                </div>
+                <div style={{
+                  minWidth: '26px', height: '26px', borderRadius: '8px',
+                  background: isSelected ? 'rgba(255,255,255,0.2)' : `${deptColor}15`,
+                  color: isSelected ? 'white' : deptColor,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '12px', fontWeight: '800'
+                }}>{u.taskCount}</div>
               </div>
             </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
-            {/* Колонка задач выбранного исполнителя */}
-            {selectedExecutor && (
-              <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{selectedExecutor.name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                      {filteredByExecutor.length} задач · {filteredByExecutor.filter(t => t.isCompleted).length} выполнено
-                    </div>
-                  </div>
-                  <button onClick={() => { setSelectedExecutor(null); setSelectedTask(null); }} style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-                </div>
-                <div style={{ padding: '12px', maxHeight: 'calc(100vh - 260px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {filteredByExecutor.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
-                      <div style={{ fontSize: '36px', marginBottom: '10px' }}>📭</div>
-                      <div style={{ fontSize: '14px' }}>Нет задач</div>
-                    </div>
-                  ) : filteredByExecutor.map(task => <TaskCard key={task.id} task={task} isSelected={selectedTask?.id === task.id} onClick={() => setSelectedTask(selectedTask?.id === task.id ? null : task)} showAssignedBy={false} />)}
-                </div>
+  // ── Кнопка "Назад" для мобильного ──
+  const BackButton = ({ onClick, label }: { onClick: () => void; label: string }) => (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px',
+        background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+        borderRadius: '10px', padding: '8px 14px', cursor: 'pointer',
+        fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)',
+      }}
+    >
+      ← {label}
+    </button>
+  );
+
+  // ── Десктопный лейаут: my ──
+  const DesktopMyView = () => (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: selectedTask ? '280px 360px 1fr' : selectedExecutor ? '280px 1fr' : '280px 1fr',
+      gap: '20px', alignItems: 'start'
+    }}>
+      <ExecutorsList />
+
+      {selectedExecutor ? (
+        <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{selectedExecutor.name}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                {filteredByExecutor.length} задач · {filteredByExecutor.filter(t => t.isCompleted).length} выполнено
               </div>
-            )}
+            </div>
+            <button onClick={() => { setSelectedExecutor(null); setSelectedTask(null); }} style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          </div>
+          <div style={{ padding: '12px', maxHeight: 'calc(100vh - 260px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {filteredByExecutor.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '36px', marginBottom: '10px' }}>📭</div>
+                <div style={{ fontSize: '14px' }}>Нет задач</div>
+              </div>
+            ) : filteredByExecutor.map(task => (
+              <TaskCard key={task.id} task={task} isSelected={selectedTask?.id === task.id} onClick={() => setSelectedTask(selectedTask?.id === task.id ? null : task)} showAssignedBy={false} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', padding: '60px 40px', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '14px' }}>👆</div>
+          <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Выберите исполнителя</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Нажмите на карточку слева чтобы увидеть задачи</div>
+        </div>
+      )}
 
-            {!selectedExecutor && (
+      {selectedTask && (
+        <TaskDetail
+          task={selectedTask} onClose={() => setSelectedTask(null)} onDelete={handleDeleteTask}
+          onStatusChange={handleStatusChange} onDeleteFile={handleDeleteFile}
+          onAddComment={handleAddComment} newComment={newComment} setNewComment={setNewComment}
+          canChangeStatus={false} canDeleteFiles={true}
+        />
+      )}
+    </div>
+  );
+
+  // ── Мобильный лейаут: my ──
+  const MobileMyView = () => {
+    if (mobileScreen === 'detail' && selectedTask) {
+      return (
+        <div>
+          <BackButton onClick={() => { setMobileScreen('tasks'); setSelectedTask(null); }} label="Назад к задачам" />
+          <TaskDetail
+            task={selectedTask} onClose={() => { setMobileScreen('tasks'); setSelectedTask(null); }} onDelete={handleDeleteTask}
+            onStatusChange={handleStatusChange} onDeleteFile={handleDeleteFile}
+            onAddComment={handleAddComment} newComment={newComment} setNewComment={setNewComment}
+            canChangeStatus={false} canDeleteFiles={true}
+          />
+        </div>
+      );
+    }
+    if (mobileScreen === 'tasks' && selectedExecutor) {
+      return (
+        <div>
+          <BackButton onClick={() => { setMobileScreen('executors'); setSelectedExecutor(null); setSelectedTask(null); }} label="Назад к исполнителям" />
+          <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{selectedExecutor.name}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{filteredByExecutor.length} задач</div>
+            </div>
+            <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {filteredByExecutor.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: '36px', marginBottom: '10px' }}>📭</div>
+                  <div style={{ fontSize: '14px' }}>Нет задач</div>
+                </div>
+              ) : filteredByExecutor.map(task => (
+                <TaskCard key={task.id} task={task} isSelected={selectedTask?.id === task.id} onClick={() => handleTaskSelect(task, selectedTask?.id === task.id)} showAssignedBy={false} />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return <ExecutorsList />;
+  };
+
+  // ── Входящие ──
+  const InboxView = () => (
+    <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: !isMobile && selectedTask ? '1fr 420px' : '1fr', gap: '20px', alignItems: 'start' }}>
+      {isMobile && mobileScreen === 'detail' && selectedTask ? (
+        <div>
+          <BackButton onClick={() => { setMobileScreen('executors'); setSelectedTask(null); }} label="Назад к заявкам" />
+          <TaskDetail
+            task={selectedTask} onClose={() => { setMobileScreen('executors'); setSelectedTask(null); }} onDelete={handleDeleteTask}
+            onStatusChange={handleStatusChange} onDeleteFile={handleDeleteFile}
+            onAddComment={handleAddComment} newComment={newComment} setNewComment={setNewComment}
+            canChangeStatus={true} canDeleteFiles={false}
+          />
+        </div>
+      ) : (
+        <>
+          <div>
+            {inboxTasks.length === 0 ? (
               <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', padding: '60px 40px', textAlign: 'center' }}>
-                <div style={{ fontSize: '48px', marginBottom: '14px' }}>👆</div>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Выберите исполнителя</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Нажмите на карточку слева чтобы увидеть задачи</div>
+                <div style={{ fontSize: '48px', marginBottom: '14px' }}>📥</div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Нет входящих заявок</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Когда кто-то назначит вам задачу — она появится здесь</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+                {inboxTasks.map(task => (
+                  <TaskCard
+                    key={task.id} task={task} isSelected={selectedTask?.id === task.id}
+                    onClick={() => handleTaskSelect(task, selectedTask?.id === task.id)}
+                    showAssignedBy={true}
+                  />
+                ))}
               </div>
             )}
-
-            {/* Детали задачи */}
-            {selectedTask && (
-              <TaskDetail
-                task={selectedTask}
-                onClose={() => setSelectedTask(null)}
-                onDelete={handleDeleteTask}
-                onStatusChange={handleStatusChange}
-                onDeleteFile={handleDeleteFile}
-                onAddComment={handleAddComment}
-                newComment={newComment}
-                setNewComment={setNewComment}
-                canChangeStatus={false}
-                canDeleteFiles={true}
-              />
-            )}
           </div>
-        ) : (
-          /* ── ВХОДЯЩИЕ ── */
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: selectedTask ? '1fr 420px' : '1fr',
-            gap: '20px', alignItems: 'start'
-          }}>
-            <div>
-              {inboxTasks.length === 0 ? (
-                <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', padding: '60px 40px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '14px' }}>📥</div>
-                  <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>Нет входящих заявок</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Когда кто-то назначит вам задачу — она появится здесь</div>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
-                  {inboxTasks.map(task => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      isSelected={selectedTask?.id === task.id}
-                      onClick={() => setSelectedTask(selectedTask?.id === task.id ? null : task)}
-                      showAssignedBy={true}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+          {!isMobile && selectedTask && (
+            <TaskDetail
+              task={selectedTask} onClose={() => setSelectedTask(null)} onDelete={handleDeleteTask}
+              onStatusChange={handleStatusChange} onDeleteFile={handleDeleteFile}
+              onAddComment={handleAddComment} newComment={newComment} setNewComment={setNewComment}
+              canChangeStatus={true} canDeleteFiles={false}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
 
-            {selectedTask && (
-              <TaskDetail
-                task={selectedTask}
-                onClose={() => setSelectedTask(null)}
-                onDelete={handleDeleteTask}
-                onStatusChange={handleStatusChange}
-                onDeleteFile={handleDeleteFile}
-                onAddComment={handleAddComment}
-                newComment={newComment}
-                setNewComment={setNewComment}
-                canChangeStatus={true}
-                canDeleteFiles={false}
-              />
-            )}
-          </div>
-        )}
+  return (
+    <div style={{ minHeight: 'calc(100vh - 70px)', background: 'var(--bg-secondary)', padding: isMobile ? '16px' : '32px 0' }}>
+      <div style={{ maxWidth: '1600px', margin: '0 auto', padding: isMobile ? '0' : '0 24px' }}>
+        <Header />
+        {view === 'my'
+          ? (isMobile ? <MobileMyView /> : <DesktopMyView />)
+          : <InboxView />
+        }
       </div>
 
       {showRequestModal && (
@@ -511,7 +587,6 @@ const TaskDetail: React.FC<{
     </div>
 
     <div style={{ padding: '16px 20px', maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
       {canChangeStatus && (
         <div>
           <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>Изменить статус</div>
@@ -522,8 +597,7 @@ const TaskDetail: React.FC<{
                 background: task.status === key ? cfg.bg : 'var(--bg-secondary)',
                 color: task.status === key ? cfg.color : 'var(--text-secondary)',
                 fontSize: '12px', fontWeight: task.status === key ? '700' : '500',
-                outline: task.status === key ? `2px solid ${cfg.color}` : 'none',
-                transition: 'all 0.15s'
+                outline: task.status === key ? `2px solid ${cfg.color}` : 'none', transition: 'all 0.15s'
               }}>{cfg.label}</button>
             ))}
           </div>
@@ -559,15 +633,11 @@ const TaskDetail: React.FC<{
               <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 11px', background: 'var(--bg-secondary)', borderRadius: '9px', border: '1px solid var(--border-color)' }}>
                 <span>📎</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: f.url !== '#' ? 'var(--text-primary)' : 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{f.size}</div>
                 </div>
-                {f.url !== '#' && (
-                  <a href={f.url} download={f.name} onClick={e => e.stopPropagation()} style={{ color: '#667eea', fontSize: '13px', textDecoration: 'none' }}>⬇</a>
-                )}
-                {canDeleteFiles && (
-                  <button onClick={() => onDeleteFile(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '13px' }}>✕</button>
-                )}
+                {f.url !== '#' && <a href={f.url} download={f.name} onClick={e => e.stopPropagation()} style={{ color: '#667eea', fontSize: '13px', textDecoration: 'none' }}>⬇</a>}
+                {canDeleteFiles && <button onClick={() => onDeleteFile(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '13px' }}>✕</button>}
               </div>
             ))}
           </div>
@@ -591,8 +661,7 @@ const TaskDetail: React.FC<{
           </div>
         ))}
         <textarea
-          value={newComment}
-          onChange={e => setNewComment(e.target.value)}
+          value={newComment} onChange={e => setNewComment(e.target.value)}
           placeholder="Написать комментарий... (Enter — отправить)"
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onAddComment(); } }}
           style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border-color)', borderRadius: '9px', fontSize: '13px', minHeight: '68px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'none', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
