@@ -54,7 +54,7 @@ export const useAuth = () => {
 // Маппинг: бэкенд возвращает snake_case → фронтенд ожидает camelCase
 function mapUser(raw: any): User {
   return {
-    id:         raw.id,
+    id:         String(raw.id),
     username:   raw.username,
     email:      raw.email,
     firstName:  raw.first_name  ?? raw.firstName  ?? '',
