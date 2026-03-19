@@ -178,6 +178,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { user } = useAuth();
   const location = useLocation();
   const socketRef = useRef<Socket | null>(null);
+  const activeChatRef = useRef<Chat | null>(null);
 
   const [chats, setChats] = useState<Chat[]>(BOT_CHATS);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
@@ -187,6 +188,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [filterType, setFilterType] = useState('all');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+
+  // Синхронизируем ref с state чтобы socket handler видел актуальный activeChat
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
 
   // ── Загрузка чатов с сервера ──────────────────────────────────────────
   useEffect(() => {
@@ -253,12 +259,17 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     socket.on('new_message', ({ message }: any) => {
       const chatId = String(message.chat_id);
-      // Бэкенд передаёт { message } где message содержит sender объект
       const newMsg: Message = mapRawMessage(message, chatId);
 
       setMessages(prev => {
-        // Не дублируем если уже есть
+        // Не дублируем если уже есть по реальному id
         if (prev.some(m => m.id === newMsg.id)) return prev;
+        // Если у нас есть оптимистичное (temp_) сообщение от себя в этом чате —
+        // это наш же отправленный, пропускаем сокет-дубль, HTTP ответ заменит temp_
+        const hasTempFromSameSender = prev.some(
+          m => m.id.startsWith('temp_') && m.chatId === chatId && m.sender.id === newMsg.sender.id
+        );
+        if (hasTempFromSameSender) return prev;
         return [...prev, newMsg];
       });
 
@@ -268,7 +279,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               ...c,
               lastMessage: message.text || '',
               lastMessageTime: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-              unreadCount: c.id !== activeChat?.id ? (c.unreadCount || 0) + 1 : c.unreadCount,
+              unreadCount: c.id !== activeChatRef.current?.id ? (c.unreadCount || 0) + 1 : c.unreadCount,
             }
           : c
       ));
@@ -337,24 +348,45 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    // Реальный чат — отправляем через HTTP, получаем через сокет
-    messagesAPI.send(activeChat.id, text.trim()).then(response => {
-      const raw = response.data.message;
-      console.log('[DEBUG] server response:', JSON.stringify(raw));
-      console.log('[DEBUG] user.id:', user?.id, 'type:', typeof user?.id);
-      console.log('[DEBUG] raw.sender:', JSON.stringify(raw?.sender));
-      const saved = mapRawMessage(raw, activeChat.id);
-      console.log('[DEBUG] mapped sender.id:', saved.sender.id, 'isMyMessage:', saved.sender.id === user?.id);
-      setMessages(prev => {
-        if (prev.some(m => m.id === saved.id)) return prev;
-        return [...prev, saved];
-      });
-      setChats(prev => prev.map(c =>
-        c.id === activeChat.id
-          ? { ...c, lastMessage: text.trim(), lastMessageTime: 'Сейчас' }
-          : c
+    // Реальный чат — оптимистичная отправка
+    // Добавляем сообщение сразу с правильным sender чтобы оно показалось справа
+    // Это предотвращает race condition когда socket приходит раньше HTTP ответа
+    const tempId = 'temp_' + Date.now();
+    const currentChatId = activeChat.id;
+    const optimisticMsg: Message = {
+      id: tempId,
+      chatId: currentChatId,
+      sender: {
+        id: user!.id,
+        firstName: user!.firstName,
+        lastName: user!.lastName,
+        isOnline: true,
+        avatar: user!.avatar,
+      },
+      text: text.trim(),
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      reactions: [],
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setChats(prev => prev.map(c =>
+      c.id === currentChatId
+        ? { ...c, lastMessage: text.trim(), lastMessageTime: 'Сейчас' }
+        : c
+    ));
+
+    messagesAPI.send(currentChatId, text.trim()).then(response => {
+      const realId = String(response.data.message.id);
+      // Заменяем tempId на реальный id от сервера
+      // Когда socket-событие придёт с тем же id — дедупликация его отбросит
+      setMessages(prev => prev.map(m =>
+        m.id === tempId ? { ...m, id: realId } : m
       ));
-    }).catch(err => console.error('Ошибка отправки:', err));
+    }).catch(err => {
+      console.error('Ошибка отправки:', err);
+      // Убираем оптимистичное сообщение если ошибка
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+    });
   };
 
   // ── Создать или открыть чат ───────────────────────────────────────────
