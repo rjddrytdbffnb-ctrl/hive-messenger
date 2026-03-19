@@ -285,12 +285,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setMessages(prev => {
         // Не дублируем если уже есть по реальному id
         if (prev.some(m => m.id === newMsg.id)) return prev;
-        // Если у нас есть оптимистичное (temp_) сообщение от себя в этом чате —
-        // это наш же отправленный, пропускаем сокет-дубль, HTTP ответ заменит temp_
-        const hasTempFromSameSender = prev.some(
+        // Если есть temp_ от того же отправителя — заменяем его на реальное сообщение
+        const tempIdx = prev.findIndex(
           m => m.id.startsWith('temp_') && m.chatId === chatId && m.sender.id === newMsg.sender.id
         );
-        if (hasTempFromSameSender) return prev;
+        if (tempIdx !== -1) {
+          const updated = [...prev];
+          updated[tempIdx] = newMsg;
+          return updated;
+        }
         return [...prev, newMsg];
       });
 
@@ -453,9 +456,24 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       : messagesAPI.send(currentChatId, text.trim());
 
     sendPromise.then(response => {
-      const realId = String(response.data.message.id);
+      const serverMsg = response.data.message;
+      const realId = String(serverMsg.id);
+      // Маппим attachments с сервера чтобы они не пропадали
+      const serverAttachments = (serverMsg.attachments && serverMsg.attachments.length > 0)
+        ? serverMsg.attachments.map((f: any) => ({
+            url: f.url,
+            original_name: f.original_name || f.filename || 'Файл',
+            name: f.original_name || f.filename || 'Файл',
+            mime_type: f.mime_type || '',
+            type: f.mime_type || '',
+            size: f.size || 0,
+            id: f.id,
+          }))
+        : undefined;
       setMessages(prev => prev.map(m =>
-        m.id === tempId ? { ...m, id: realId } : m
+        m.id === tempId
+          ? { ...m, id: realId, attachments: serverAttachments || m.attachments }
+          : m
       ));
     }).catch(err => {
       console.error('Ошибка отправки:', err);
