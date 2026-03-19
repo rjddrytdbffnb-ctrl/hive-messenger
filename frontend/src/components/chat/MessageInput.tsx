@@ -1,5 +1,6 @@
 // src/components/chat/MessageInput.tsx
 import React, { useState, useRef, useEffect, DragEvent } from 'react';
+import GalleryPicker, { GalleryFile } from '../GalleryPicker';
 import { useChat } from '../../context/ChatContext';
 import MentionInput from '../MentionInput';
 
@@ -33,6 +34,7 @@ const MessageInput: React.FC = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -121,6 +123,19 @@ const MessageInput: React.FC = () => {
     processFiles(Array.from(e.target.files || []));
   };
 
+  const handleGallerySelect = (galleryFiles: GalleryFile[]) => {
+    // Конвертируем GalleryFile в объекты совместимые с File для отображения
+    // Создаём псевдо-File объекты из URL
+    const pseudoFiles = galleryFiles.map(gf => {
+      const pseudo = new File([''], gf.name, { type: gf.type === 'image' ? 'image/jpeg' : 'application/octet-stream' });
+      Object.defineProperty(pseudo, 'galleryUrl', { value: gf.url });
+      Object.defineProperty(pseudo, 'galleryId', { value: gf.id });
+      return pseudo;
+    });
+    setAttachedFiles(prev => [...prev, ...pseudoFiles]);
+    setShowGallery(false);
+  };
+
   const removeFile = (index: number) => {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
@@ -136,6 +151,14 @@ const MessageInput: React.FC = () => {
   if (!activeChat) return null;
 
   return (
+    <>
+      {showGallery && (
+        <GalleryPicker
+          onSelect={handleGallerySelect}
+          onClose={() => setShowGallery(false)}
+          multiple={true}
+        />
+      )}
     <div
       ref={containerRef}
       onDragOver={handleDragOver}
@@ -226,6 +249,7 @@ const MessageInput: React.FC = () => {
         <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignSelf: 'flex-end', paddingBottom: '4px' }}>
           <ActionButton icon="📎" tooltip="Прикрепить файл" onClick={() => fileInputRef.current?.click()} />
           <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
+          <ActionButton icon="🗂️" tooltip="Из галереи" onClick={() => setShowGallery(true)} />
 
           {/* ЭМОДЗИ */}
           <div style={{ position: 'relative' }}>
@@ -324,6 +348,7 @@ const MessageInput: React.FC = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 
