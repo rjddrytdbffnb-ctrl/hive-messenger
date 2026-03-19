@@ -38,7 +38,8 @@ const EmployeesPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`/api/users/${updated.id}`, {
+      const API_BASE = process.env.REACT_APP_API_URL || '';
+      const res = await fetch(`${API_BASE}/api/users/${updated.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
