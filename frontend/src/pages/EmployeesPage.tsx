@@ -38,7 +38,7 @@ const EmployeesPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await fetch(`/api/users/${updated.id}`, {
+      const res = await fetch(`/api/users/${updated.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -53,8 +53,12 @@ const EmployeesPage: React.FC = () => {
           role: updated.role,
         })
       });
+      const data = await res.json();
+      console.log('Сохранение:', res.status, JSON.stringify(data));
+      alert('Сохранено: ' + res.status + ' ' + JSON.stringify(data));
     } catch (err) {
       console.error('Ошибка сохранения на сервер:', err);
+      alert('Ошибка: ' + err);
     }
 
     setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
