@@ -32,7 +32,7 @@ const MessageInput: React.FC = () => {
   const { sendMessage, replyingTo, setReplyingTo, activeChat, isTyping, setIsTyping } = useChat();
   const [text, setText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -124,15 +124,8 @@ const MessageInput: React.FC = () => {
   };
 
   const handleGallerySelect = (galleryFiles: GalleryFile[]) => {
-    // Конвертируем GalleryFile в объекты совместимые с File для отображения
-    // Создаём псевдо-File объекты из URL
-    const pseudoFiles = galleryFiles.map(gf => {
-      const pseudo = new File([''], gf.name, { type: gf.type === 'image' ? 'image/jpeg' : 'application/octet-stream' });
-      Object.defineProperty(pseudo, 'galleryUrl', { value: gf.url });
-      Object.defineProperty(pseudo, 'galleryId', { value: gf.id });
-      return pseudo;
-    });
-    setAttachedFiles(prev => [...prev, ...pseudoFiles]);
+    // Храним GalleryFile напрямую — у них уже есть url с сервера
+    setAttachedFiles(prev => [...prev, ...galleryFiles]);
     setShowGallery(false);
   };
 
@@ -228,12 +221,12 @@ const MessageInput: React.FC = () => {
               borderRadius: '8px', fontSize: '13px',
               border: '1px solid var(--border-color)'
             }}>
-              <span>{getFileIcon(file)}</span>
+              <span>{file instanceof File ? getFileIcon(file) : (file.type === 'image' ? '🖼️' : file.type === 'video' ? '🎬' : '📎')}</span>
               <span style={{ color: 'var(--text-primary)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {file.name}
               </span>
               <span style={{ color: 'var(--text-tertiary)', fontSize: '11px', flexShrink: 0 }}>
-                {(file.size / 1024).toFixed(0)}KB
+                {file.size > 0 ? (file.size > 1024*1024 ? (file.size/1024/1024).toFixed(1)+'MB' : Math.round(file.size/1024)+'KB') : ''}
               </span>
               <button onClick={() => removeFile(index)} style={{
                 background: 'none', border: 'none', cursor: 'pointer',
