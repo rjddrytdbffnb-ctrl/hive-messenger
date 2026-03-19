@@ -285,22 +285,35 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setMessages(prev => {
         // Не дублируем если уже есть по реальному id
         if (prev.some(m => m.id === newMsg.id)) return prev;
-        // Если есть temp_ от того же отправителя — заменяем его на реальное сообщение
+
+        // Ищем temp_ сообщение от того же отправителя
         const tempIdx = prev.findIndex(
           m => m.id.startsWith('temp_') && m.chatId === chatId && m.sender.id === newMsg.sender.id
         );
         if (tempIdx !== -1) {
           const tempMsg = prev[tempIdx];
           const updated = [...prev];
-          // Сохраняем attachments из temp_ если сервер не вернул их в socket
           updated[tempIdx] = {
             ...newMsg,
-            attachments: newMsg.attachments && newMsg.attachments.length > 0
+            attachments: (newMsg.attachments && newMsg.attachments.length > 0)
               ? newMsg.attachments
               : tempMsg.attachments,
           };
           return updated;
         }
+
+        // Ищем сообщение с реальным id (HTTP уже заменил temp_) — обновляем attachments
+        const realIdx = prev.findIndex(m => m.id === newMsg.id);
+        if (realIdx !== -1) {
+          // Уже есть — обновляем attachments если в socket они есть
+          if (newMsg.attachments && newMsg.attachments.length > 0) {
+            const updated = [...prev];
+            updated[realIdx] = { ...prev[realIdx], attachments: newMsg.attachments };
+            return updated;
+          }
+          return prev;
+        }
+
         return [...prev, newMsg];
       });
 
