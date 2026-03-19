@@ -1,8 +1,10 @@
 // src/pages/MediaGalleryPage.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '../context/ChatContext';
 import { MediaFile } from '../context/ChatContext';
+
+const API_BASE = process.env.REACT_APP_API_URL || '';
 
 const MediaGalleryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -10,9 +12,36 @@ const MediaGalleryPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'files'>('images');
   const [selectedItem, setSelectedItem] = useState<MediaFile | null>(null);
-  const [manualFiles, setManualFiles] = useState<MediaFile[]>(() => {
-    try { return JSON.parse(localStorage.getItem('corp_gallery_manual') || '[]'); } catch { return []; }
-  });
+  const [manualFiles, setManualFiles] = useState<MediaFile[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  // Загружаем файлы с сервера при монтировании
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/api/media`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then(r => r.json()).then(data => {
+      if (data.files) {
+        const mapped: MediaFile[] = data.files.map((f: any) => {
+          const ext = (f.name || '').split('.').pop()?.toLowerCase() || '';
+          const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext) || (f.mime_type || '').startsWith('image/');
+          const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext) || (f.mime_type || '').startsWith('video/');
+          const sizeFmt = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+' MB' : Math.round(f.size/1024)+' KB';
+          return {
+            id: String(f.id),
+            name: f.name || f.original_name,
+            url: f.url,
+            size: sizeFmt,
+            type: isImage ? 'image' : isVideo ? 'video' : 'file',
+            chatName: 'Загружено вручную',
+            sender: f.first_name ? `${f.first_name} ${f.last_name}` : 'Вы',
+            date: f.created_at ? new Date(f.created_at).toLocaleDateString('ru-RU') : '',
+          };
+        });
+        setManualFiles(mapped);
+      }
+    }).catch(() => {});
+  }, []);
 
   // Собираем все mediaFiles из всех сообщений всех чатов
   const chatMedia: MediaFile[] = [];
@@ -22,7 +51,7 @@ const MediaGalleryPage: React.FC = () => {
     });
   });
 
-  // Объединяем: из чатов + вручную загруженные, убираем дубли по id
+  // Объединяем: из чатов + с сервера, убираем дубли по id
   const allMedia = [...chatMedia, ...manualFiles];
   const seen = new Set<string>();
   const uniqueMedia = allMedia.filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; });
@@ -33,31 +62,41 @@ const MediaGalleryPage: React.FC = () => {
 
   const filtered = activeTab === 'images' ? images : activeTab === 'videos' ? videos : files;
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploaded = Array.from(e.target.files || []);
-    const newMedia: MediaFile[] = uploaded.map((f, i) => {
-      const ext = f.name.split('.').pop()?.toLowerCase() || '';
-      const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
-      const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext);
-      return {
-        id: `manual_${Date.now()}_${i}`,
-        name: f.name,
-        url: URL.createObjectURL(f),
-        size: f.size > 1024 * 1024 ? (f.size / 1024 / 1024).toFixed(1) + ' MB' : (f.size / 1024).toFixed(0) + ' KB',
-        type: isImage ? 'image' : isVideo ? 'video' : 'file',
-        chatName: 'Загружено вручную',
-        sender: 'Вы',
-        date: new Date().toLocaleDateString('ru-RU'),
-      };
-    });
-    const updated = [...manualFiles, ...newMedia];
-    setManualFiles(updated);
-    // сохраняем без blob url (они не переживут перезагрузку)
-    try {
-      localStorage.setItem('corp_gallery_manual', JSON.stringify(
-        updated.map(f => ({ ...f, url: f.url.startsWith('blob:') ? '#' : f.url }))
-      ));
-    } catch {}
+    if (!uploaded.length) return;
+    setUploading(true);
+    const token = localStorage.getItem('token');
+    for (const file of uploaded) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch(`${API_BASE}/api/media`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+        });
+        const data = await res.json();
+        if (data.file) {
+          const ext = file.name.split('.').pop()?.toLowerCase() || '';
+          const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+          const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext);
+          const sizeFmt = file.size > 1024*1024 ? (file.size/1024/1024).toFixed(1)+' MB' : Math.round(file.size/1024)+' KB';
+          const newFile: MediaFile = {
+            id: String(data.file.id),
+            name: file.name,
+            url: data.file.url,
+            size: sizeFmt,
+            type: isImage ? 'image' : isVideo ? 'video' : 'file',
+            chatName: 'Загружено вручную',
+            sender: 'Вы',
+            date: new Date().toLocaleDateString('ru-RU'),
+          };
+          setManualFiles(prev => [newFile, ...prev]);
+        }
+      } catch {}
+    }
+    setUploading(false);
     e.target.value = '';
   };
 
