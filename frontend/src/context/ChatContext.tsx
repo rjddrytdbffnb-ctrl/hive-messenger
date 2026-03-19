@@ -339,9 +339,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Реальный чат — отправляем через HTTP, получаем через сокет
     messagesAPI.send(activeChat.id, text.trim()).then(response => {
-      const saved = mapRawMessage(response.data.message, activeChat.id);
-      // Убеждаемся что sender.id совпадает с user.id по типу
-      saved.sender.id = String(saved.sender.id);
+      const raw = response.data.message;
+      console.log('[DEBUG] server response:', JSON.stringify(raw));
+      console.log('[DEBUG] user.id:', user?.id, 'type:', typeof user?.id);
+      console.log('[DEBUG] raw.sender:', JSON.stringify(raw?.sender));
+      const saved = mapRawMessage(raw, activeChat.id);
+      console.log('[DEBUG] mapped sender.id:', saved.sender.id, 'isMyMessage:', saved.sender.id === user?.id);
       setMessages(prev => {
         if (prev.some(m => m.id === saved.id)) return prev;
         return [...prev, saved];
