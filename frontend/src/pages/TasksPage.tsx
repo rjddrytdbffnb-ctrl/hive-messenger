@@ -295,7 +295,7 @@ const TasksPage: React.FC = () => {
           <button
             onClick={() => setDeptFilter('all')}
             style={{
-              padding: '4px 12px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+              padding: '4px 12px', borderRadius: '20px', cursor: 'pointer',
               fontSize: '12px', fontWeight: '700', transition: 'all 0.15s',
               background: deptFilter === 'all' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'var(--bg-primary)',
               color: deptFilter === 'all' ? 'white' : 'var(--text-secondary)',
@@ -841,7 +841,7 @@ const RequestModal: React.FC<{
                     <button
                       onClick={() => setModalDeptFilter('all')}
                       style={{
-                        padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+                        padding: '3px 10px', borderRadius: '20px', cursor: 'pointer',
                         fontSize: '11px', fontWeight: '700',
                         background: modalDeptFilter === 'all' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'var(--bg-secondary)',
                         color: modalDeptFilter === 'all' ? 'white' : 'var(--text-secondary)',
