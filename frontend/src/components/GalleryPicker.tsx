@@ -74,7 +74,7 @@ const GalleryPicker: React.FC<Props> = ({ onSelect, onClose, multiple = true }) 
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed', inset: 0, zIndex: 2000,
       background: 'rgba(0,0,0,0.6)', display: 'flex',
       alignItems: 'center', justifyContent: 'center', padding: '16px'
     }} onClick={onClose}>
