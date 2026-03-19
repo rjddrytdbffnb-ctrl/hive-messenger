@@ -344,37 +344,19 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    // Реальный чат — через сокет
-    if (socketRef.current?.connected) {
-      // Оптимистично добавляем сообщение сразу
-      const tempId = `temp_${Date.now()}`;
-      const optimistic: Message = {
-        id: tempId,
-        chatId: activeChat.id,
-        sender: { id: user?.id || '', firstName: user?.firstName || '', lastName: user?.lastName || '', isOnline: true },
-        text: text.trim(),
-        timestamp: new Date().toISOString(),
-        isRead: false,
-        reactions: [],
-      };
-      setMessages(prev => [...prev, optimistic]);
+    // Реальный чат — отправляем через HTTP, получаем через сокет
+    messagesAPI.send(activeChat.id, text.trim()).then(response => {
+      const saved = mapRawMessage(response.data.message, activeChat.id);
+      setMessages(prev => {
+        if (prev.some(m => m.id === saved.id)) return prev;
+        return [...prev, saved];
+      });
       setChats(prev => prev.map(c =>
         c.id === activeChat.id
           ? { ...c, lastMessage: text.trim(), lastMessageTime: 'Сейчас' }
           : c
       ));
-
-      socketRef.current.emit('send_message', {
-        chatId: activeChat.id,
-        text: text.trim(),
-      });
-    } else {
-      // Fallback: HTTP запрос если сокет не подключён
-      messagesAPI.send(activeChat.id, text.trim()).then(response => {
-        const saved = mapRawMessage(response.data.message, activeChat.id);
-        setMessages(prev => [...prev, saved]);
-      }).catch(err => console.error('Ошибка отправки:', err));
-    }
+    }).catch(err => console.error('Ошибка отправки:', err));
   };
 
   // ── Создать или открыть чат ───────────────────────────────────────────
