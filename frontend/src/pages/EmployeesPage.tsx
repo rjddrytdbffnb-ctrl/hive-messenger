@@ -29,12 +29,34 @@ const EmployeesPage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
-  const saveEmployeeEdits = (updated: Employee) => {
+  const saveEmployeeEdits = async (updated: Employee) => {
     try {
       const edits = JSON.parse(localStorage.getItem('corp_employee_edits') || '{}');
       edits[updated.id] = { department: updated.department, position: updated.position, role: updated.role, firstName: updated.firstName, lastName: updated.lastName, email: updated.email };
       localStorage.setItem('corp_employee_edits', JSON.stringify(edits));
     } catch {}
+
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`/api/users/${updated.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          first_name: updated.firstName,
+          last_name: updated.lastName,
+          email: updated.email,
+          department: updated.department,
+          position: updated.position,
+          role: updated.role,
+        })
+      });
+    } catch (err) {
+      console.error('Ошибка сохранения на сервер:', err);
+    }
+
     setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
     setEditingEmployee(null);
   };
