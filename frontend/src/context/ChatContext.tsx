@@ -1,365 +1,575 @@
-// src/components/chat/MessageList.tsx
-import React, { useEffect, useRef, useState } from 'react';
-import { useChat } from '../../context/ChatContext';
-import { useAuth } from '../../context/AuthContext';
+// src/context/ChatContext.tsx - РЕАЛЬНЫЙ API + SOCKET.IO
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { useAuth } from './AuthContext';
+import { useLocation } from 'react-router-dom';
+import { chatsAPI, messagesAPI } from '../services/api';
+import { getSmartBotResponse, isBot } from '../services/chatBots';
+import { io, Socket } from 'socket.io-client';
 
-const MessageList: React.FC = () => {
-  const { activeChat, messages, setReplyingTo, replyingTo } = useChat();
-  const { user } = useAuth();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+const SOCKET_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-  // Автопрокрутка вниз при новых сообщениях
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  isOnline?: boolean;
+  avatar?: string;
+  department?: string;
+}
 
-  if (!activeChat) {
-    return (
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--bg-secondary)',
-        color: 'var(--text-secondary)',
-        fontSize: '18px'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>💬</div>
-          <div>Выберите чат для начала общения</div>
-        </div>
-      </div>
-    );
+interface Reaction {
+  emoji: string;
+  userId: string;
+  userName: string;
+}
+
+export interface MediaFile {
+  id: string;
+  name: string;
+  url: string;
+  size: string;
+  type: 'image' | 'video' | 'file';
+  chatName: string;
+  sender: string;
+  date: string;
+}
+
+export interface Message {
+  id: string;
+  chatId: string;
+  sender: User;
+  text: string;
+  timestamp: string;
+  isRead: boolean;
+  isDeleted?: boolean;
+  isEdited?: boolean;
+  replyTo?: Message;
+  attachments?: any[];
+  mediaFiles?: MediaFile[];
+  reactions?: Reaction[];
+}
+
+export interface Chat {
+  id: string;
+  name: string;
+  type: 'direct' | 'group';
+  avatar: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  isPinned?: boolean;
+  isArchived?: boolean;
+  isOnline?: boolean;
+  isMuted?: boolean;
+  participants?: User[];
+  messages?: Message[];
+}
+
+interface ChatContextType {
+  chats: Chat[];
+  activeChat: Chat | null;
+  setActiveChat: (chat: Chat | null) => void;
+  sendMessage: (text: string, files?: File[]) => void;
+  replyingTo: Message | null;
+  setReplyingTo: (message: Message | null) => void;
+  isTyping: boolean;
+  setIsTyping: (typing: boolean) => void;
+  markAsRead: (chatId: string) => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  filterType: string;
+  setFilterType: (type: string) => void;
+  pinChat: (chatId: string) => void;
+  unpinChat: (chatId: string) => void;
+  archiveChat: (chatId: string) => void;
+  unarchiveChat: (chatId: string) => void;
+  loading: boolean;
+  messages: Message[];
+  addReaction: (messageId: string, emoji: string) => void;
+  removeReaction: (messageId: string, emoji: string) => void;
+  deleteMessage: (messageId: string) => void;
+  editMessage: (messageId: string, newText: string) => void;
+  forwardMessage: (messageId: string, chatIds: string[]) => void;
+  createOrOpenChat: (employee: any) => string;
+  createGroupChat: (name: string, participants: User[]) => string;
+  muteChat: (chatId: string) => void;
+  unmuteChat: (chatId: string) => void;
+  deleteChat: (chatId: string) => void;
+}
+
+const ChatContext = createContext<ChatContextType | undefined>(undefined);
+
+// Уведомления в localStorage
+export function pushNotification(title: string, message: string, type: string) {
+  try {
+    const notifs = JSON.parse(localStorage.getItem('corp_notifications') || '[]');
+    const newNotif = {
+      id: Date.now(), type, title, message,
+      related_id: null, is_read: false,
+      created_at: new Date().toISOString(),
+    };
+    localStorage.setItem('corp_notifications', JSON.stringify([newNotif, ...notifs].slice(0, 50)));
+  } catch {}
+}
+
+// Маппинг сырого сообщения из API/сокета в Message
+function mapRawMessage(raw: any, chatId: string): Message {
+  // Бэкенд всегда возвращает объект sender: { id, username, first_name, last_name }
+  // raw.sender_id есть у POST-ответа, но id надо брать из sender объекта
+  const sender = raw.sender || {};
+  return {
+    id: String(raw.id),
+    chatId: String(chatId),
+    sender: {
+      id: String(sender.id || raw.sender_id || raw.user_id || ''),
+      firstName: sender.first_name || sender.username || raw.first_name || '',
+      lastName: sender.last_name || raw.last_name || '',
+      isOnline: sender.is_online || false,
+      avatar: sender.avatar,
+      department: sender.department,
+    },
+    text: raw.text || '',
+    timestamp: raw.created_at || new Date().toISOString(),
+    isRead: raw.is_read || false,
+    reactions: [],
+    attachments: (raw.attachments && raw.attachments.length > 0)
+      ? raw.attachments.map((f: any) => ({
+          url: f.url,
+          original_name: f.original_name || f.filename || 'Файл',
+          name: f.original_name || f.filename || 'Файл',
+          mime_type: f.mime_type || '',
+          type: f.mime_type || '',
+          size: f.size || 0,
+          id: f.id,
+        }))
+      : undefined,
+  };
+}
+
+// Маппинг чата из API
+function mapRawChat(raw: any): Chat {
+  const lm = raw.last_message;
+  return {
+    id: String(raw.id),
+    name: raw.name || 'Чат',
+    type: raw.type || 'direct',
+    avatar: raw.avatar || raw.name?.[0] || '?',
+    lastMessage: lm?.text || '',
+    lastMessageTime: lm?.created_at
+      ? new Date(lm.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+      : '',
+    unreadCount: raw.unread_count || 0,
+    isPinned: false,
+    isArchived: false,
+    isMuted: false,
+    // isOnline берём из участников (для direct чата — онлайн собеседника)
+    isOnline: raw.participants
+      ? (raw.participants as any[]).some((p: any) => p.is_online)
+      : false,
+    participants: (raw.participants || []).map((p: any) => ({
+      id: String(p.id),
+      firstName: p.first_name || p.username || '',
+      lastName: p.last_name || '',
+      isOnline: p.is_online || false,
+      avatar: p.avatar,
+      department: p.department,
+    })),
+    messages: [],
+  };
+}
+
+const BOT_CHATS: Chat[] = [
+  {
+    id: 'bot_chat_alex', name: 'Алексей Иванов (БОТ)', type: 'direct', avatar: 'АИ',
+    lastMessage: 'Привет! Это тестовый бот', lastMessageTime: '10:30',
+    unreadCount: 0, isPinned: false, isArchived: false, isMuted: false, isOnline: true,
+    participants: [{ id: 'bot_alex', firstName: 'Алексей', lastName: 'Иванов', isOnline: true }],
+    messages: []
+  },
+  {
+    id: 'bot_chat_maria', name: 'Мария Петрова (БОТ)', type: 'direct', avatar: 'МП',
+    lastMessage: 'Готова помочь!', lastMessageTime: '09:15',
+    unreadCount: 0, isPinned: false, isArchived: false, isMuted: false, isOnline: true,
+    participants: [{ id: 'bot_maria', firstName: 'Мария', lastName: 'Петрова', isOnline: true }],
+    messages: []
   }
+];
 
-  const chatMessages = messages.filter(m => m.chatId === activeChat.id && !m.isDeleted);
+export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const location = useLocation();
+  const socketRef = useRef<Socket | null>(null);
+  const activeChatRef = useRef<Chat | null>(null);
 
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const [chats, setChats] = useState<Chat[]>(BOT_CHATS);
+  const [activeChat, setActiveChat] = useState<Chat | null>(null);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  // Синхронизируем ref с state чтобы socket handler видел актуальный activeChat
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
+  // ── Загрузка чатов с сервера ──────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    loadChatsFromAPI();
+  }, [user]);
+
+  const loadChatsFromAPI = async () => {
+    try {
+      setLoading(true);
+      const response = await chatsAPI.getAll();
+      const serverChats = response.data.chats.map(mapRawChat);
+      setChats([...BOT_CHATS, ...serverChats]);
+    } catch (err) {
+      console.error('Ошибка загрузки чатов:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Загрузка сообщений при смене активного чата ───────────────────────
+  useEffect(() => {
+    if (!activeChat) return;
+    if (activeChat.id.startsWith('bot_')) return; // боты — локально
+
+    const loadMessages = async () => {
+      try {
+        const response = await messagesAPI.getByChat(activeChat.id);
+        const mapped = response.data.messages.map((m: any) => mapRawMessage(m, activeChat.id));
+        setMessages(prev => {
+          // Удаляем старые сообщения этого чата, добавляем новые
+          const other = prev.filter(m => m.chatId !== activeChat.id);
+          return [...other, ...mapped];
+        });
+      } catch (err) {
+        console.error('Ошибка загрузки сообщений:', err);
+      }
+    };
+    loadMessages();
+  }, [activeChat?.id]);
+
+  // ── Socket.io ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('🔌 Socket подключён');
+      socket.emit('join_chats');
+      socket.emit('join_user_room');
+      socket.emit('user_online');
+    });
+
+    socket.on('new_message', ({ message }: any) => {
+      const chatId = String(message.chat_id);
+      const newMsg: Message = mapRawMessage(message, chatId);
+
+      setMessages(prev => {
+        // Не дублируем если уже есть по реальному id
+        if (prev.some(m => m.id === newMsg.id)) return prev;
+        // Если у нас есть оптимистичное (temp_) сообщение от себя в этом чате —
+        // это наш же отправленный, пропускаем сокет-дубль, HTTP ответ заменит temp_
+        const hasTempFromSameSender = prev.some(
+          m => m.id.startsWith('temp_') && m.chatId === chatId && m.sender.id === newMsg.sender.id
+        );
+        if (hasTempFromSameSender) return prev;
+        return [...prev, newMsg];
+      });
+
+      setChats(prev => prev.map(c =>
+        c.id === chatId
+          ? {
+              ...c,
+              lastMessage: message.text || '',
+              lastMessageTime: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+              unreadCount: c.id !== activeChatRef.current?.id ? (c.unreadCount || 0) + 1 : c.unreadCount,
+            }
+          : c
+      ));
+    });
+
+    // Обновляем онлайн-статус в реальном времени
+    socket.on('user_status_change', ({ userId, status }: { userId: string; status: string }) => {
+      const isOnline = status === 'online';
+      const uid = String(userId);
+
+      // Обновляем список чатов
+      setChats(prev => prev.map(c => {
+        if (!c.participants?.some(p => String(p.id) === uid)) return c;
+        return {
+          ...c,
+          isOnline: c.type === 'direct' ? isOnline : c.isOnline,
+          participants: (c.participants || []).map(p =>
+            String(p.id) === uid ? { ...p, isOnline } : p
+          ),
+        };
+      }));
+
+      // Обновляем активный чат чтобы шапка сразу изменилась
+      setActiveChat(prev => {
+        if (!prev) return prev;
+        if (!prev.participants?.some(p => String(p.id) === uid)) return prev;
+        return {
+          ...prev,
+          isOnline: prev.type === 'direct' ? isOnline : prev.isOnline,
+          participants: (prev.participants || []).map(p =>
+            String(p.id) === uid ? { ...p, isOnline } : p
+          ),
+        };
+      });
+
+      // Уведомляем другие компоненты (EmployeesPage) через custom event
+      window.dispatchEvent(new CustomEvent('user_status_change', {
+        detail: { userId: uid, isOnline }
+      }));
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('❌ Socket отключён:', reason);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Socket ошибка:', err.message);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [user]);
+
+  // Подключаемся к комнате нового активного чата
+  useEffect(() => {
+    if (!activeChat || activeChat.id.startsWith('bot_')) return;
+    socketRef.current?.emit('join_chat', activeChat.id);
+  }, [activeChat?.id]);
+
+  // ── Навигация из EmployeesPage ────────────────────────────────────────
+  useEffect(() => {
+    const state = location.state as any;
+    if (!state?.startChatWith) return;
+    const emp = state.startChatWith;
+    createOrOpenChat(emp);
+    window.history.replaceState({}, document.title);
+  }, [location.state]);
+
+  // ── Отправка сообщения ─────────────────────────────────────────────────
+  const sendMessage = (text: string, files?: File[]) => {
+    if (!activeChat) return;
+
+    // Боты — локально
+    if (activeChat.id.startsWith('bot_')) {
+      const botMsg: Message = {
+        id: Date.now().toString(),
+        chatId: activeChat.id,
+        sender: { id: user?.id || '1', firstName: user?.firstName || 'Вы', lastName: user?.lastName || '', isOnline: true },
+        text: text.trim(),
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        reactions: [],
+      };
+      setMessages(prev => [...prev, botMsg]);
+      setTimeout(() => {
+        const botId = activeChat.participants?.[0]?.id || 'bot';
+        const replyObj = getSmartBotResponse(botId, text);
+        const reply = replyObj?.text || "...";
+        const replyMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          chatId: activeChat.id,
+          sender: activeChat.participants?.[0] || { id: 'bot', firstName: 'Бот', lastName: '', isOnline: true },
+          text: reply,
+          timestamp: new Date().toISOString(),
+          isRead: false,
+          reactions: [],
+        };
+        setMessages(prev => [...prev, replyMsg]);
+      }, 800);
+      return;
+    }
+
+    // Реальный чат — оптимистичная отправка
+    // Добавляем сообщение сразу с правильным sender чтобы оно показалось справа
+    // Это предотвращает race condition когда socket приходит раньше HTTP ответа
+    const tempId = 'temp_' + Date.now();
+    const currentChatId = activeChat.id;
+    const optimisticMsg: Message = {
+      id: tempId,
+      chatId: currentChatId,
+      sender: {
+        id: user!.id,
+        firstName: user!.firstName,
+        lastName: user!.lastName,
+        isOnline: true,
+        avatar: user!.avatar,
+      },
+      text: text.trim() || (files?.length ? files.map(f => f.name).join(', ') : ''),
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      reactions: [],
+      attachments: files && files.length > 0 ? files : undefined,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setChats(prev => prev.map(c =>
+      c.id === currentChatId
+        ? { ...c, lastMessage: text.trim() || 'Файл', lastMessageTime: 'Сейчас' }
+        : c
+    ));
+
+    // Если есть файлы — отправляем через multipart, иначе обычный JSON
+    const sendPromise = (files && files.length > 0)
+      ? (() => {
+          const formData = new FormData();
+          if (text.trim()) formData.append('text', text.trim());
+          else formData.append('text', ' '); // бэкенд требует непустой text
+          files.forEach(f => formData.append('files', f));
+          return messagesAPI.sendWithFile(currentChatId, formData);
+        })()
+      : messagesAPI.send(currentChatId, text.trim());
+
+    sendPromise.then(response => {
+      const realId = String(response.data.message.id);
+      setMessages(prev => prev.map(m =>
+        m.id === tempId ? { ...m, id: realId } : m
+      ));
+    }).catch(err => {
+      console.error('Ошибка отправки:', err);
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+    });
+  };
+
+  // ── Создать или открыть чат ───────────────────────────────────────────
+  const createOrOpenChat = (employee: any): string => {
+    const empId = String(employee.id);
+
+    // Ищем существующий чат
+    const existing = chats.find(c =>
+      c.type === 'direct' && c.participants?.some(p => String(p.id) === empId)
+    );
+    if (existing) {
+      setActiveChat(existing);
+      return existing.id;
+    }
+
+    // Создаём через API
+    chatsAPI.createDirect(empId).then(response => {
+      const newChat = mapRawChat(response.data.chat);
+      newChat.participants = [employee];
+      setChats(prev => [newChat, ...prev.filter(c => !c.id.startsWith('bot_')), ...BOT_CHATS]);
+      setActiveChat(newChat);
+      socketRef.current?.emit('join_chat', newChat.id);
+    }).catch(() => {
+      // Fallback: локальный чат
+      const localChat: Chat = {
+        id: `local_${Date.now()}`,
+        name: `${employee.firstName} ${employee.lastName}`,
+        type: 'direct',
+        avatar: employee.avatar || `${employee.firstName[0]}${employee.lastName[0]}`,
+        lastMessage: 'Начните общение...',
+        lastMessageTime: '',
+        unreadCount: 0,
+        isPinned: false, isArchived: false, isMuted: false,
+        participants: [employee],
+        messages: [],
+      };
+      setChats(prev => [localChat, ...prev]);
+      setActiveChat(localChat);
+    });
+
+    return '';
+  };
+
+  const createGroupChat = (name: string, participants: User[]): string => {
+    const ids = participants.map(p => p.id);
+    chatsAPI.create(name, 'group', ids).then(response => {
+      const newChat = mapRawChat(response.data.chat);
+      newChat.participants = participants;
+      setChats(prev => [newChat, ...prev]);
+      setActiveChat(newChat);
+    }).catch(console.error);
+    return '';
+  };
+
+  const markAsRead = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, unreadCount: 0 } : c));
+  const pinChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isPinned: true } : c));
+  const unpinChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isPinned: false } : c));
+  const archiveChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isArchived: true } : c));
+  const unarchiveChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isArchived: false } : c));
+  const muteChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isMuted: true } : c));
+  const unmuteChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isMuted: false } : c));
+  const deleteChat = (id: string) => {
+    setChats(p => p.filter(c => c.id !== id));
+    setMessages(p => p.filter(m => m.chatId !== id));
+    if (activeChat?.id === id) setActiveChat(null);
+  };
+
+  const addReaction = (messageId: string, emoji: string) => {
+    setMessages(prev => prev.map(m =>
+      m.id === messageId
+        ? { ...m, reactions: [...(m.reactions || []), { emoji, userId: user?.id || '', userName: user?.firstName || '' }] }
+        : m
+    ));
+    socketRef.current?.emit('add_reaction', { messageId, emoji });
+  };
+
+  const removeReaction = (messageId: string, emoji: string) => {
+    setMessages(prev => prev.map(m =>
+      m.id === messageId
+        ? { ...m, reactions: (m.reactions || []).filter(r => !(r.emoji === emoji && r.userId === user?.id)) }
+        : m
+    ));
+    socketRef.current?.emit('remove_reaction', { messageId, emoji });
+  };
+
+  const deleteMessage = (messageId: string) =>
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isDeleted: true, text: 'Сообщение удалено' } : m));
+
+  const editMessage = (messageId: string, newText: string) =>
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m));
+
+  const forwardMessage = (messageId: string, chatIds: string[]) => {
+    const original = messages.find(m => m.id === messageId);
+    if (!original) return;
+    chatIds.forEach(chatId => {
+      const fwd: Message = { ...original, id: `fwd_${Date.now()}`, chatId, timestamp: new Date().toISOString() };
+      setMessages(prev => [...prev, fwd]);
+    });
   };
 
   return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'var(--bg-secondary)',
-      overflow: 'hidden'
+    <ChatContext.Provider value={{
+      chats, activeChat, setActiveChat, sendMessage,
+      replyingTo, setReplyingTo, isTyping, setIsTyping,
+      markAsRead, searchQuery, setSearchQuery, filterType, setFilterType,
+      pinChat, unpinChat, archiveChat, unarchiveChat,
+      loading, messages,
+      addReaction, removeReaction, deleteMessage, editMessage, forwardMessage,
+      createOrOpenChat, createGroupChat, muteChat, unmuteChat, deleteChat,
     }}>
-      {/* ШАПКА ЧАТА */}
-      <div style={{
-        padding: '16px 24px',
-        background: 'var(--accent-gradient)',
-        color: 'white',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        boxShadow: 'var(--shadow-md)'
-      }}>
-        <div style={{
-          width: '48px',
-          height: '48px',
-          borderRadius: '50%',
-          background: 'rgba(255,255,255,0.2)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '20px',
-          fontWeight: 'bold',
-          border: '2px solid rgba(255,255,255,0.3)',
-          flexShrink: 0
-        }}>
-          {activeChat.type === 'direct' ? activeChat.name[0] : '👥'}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: '700', fontSize: '16px', color: 'white' }}>
-            {activeChat.name}
-          </div>
-          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {activeChat.type === 'direct' && activeChat.isOnline && (
-              <>
-                <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#4ade80', display: 'inline-block', boxShadow: '0 0 6px #4ade80' }} />
-                В сети
-              </>
-            )}
-            {activeChat.type === 'direct' && !activeChat.isOnline && 'Не в сети'}
-            {activeChat.type === 'group' && `${activeChat.participants?.length || 0} участников`}
-          </div>
-        </div>
-      </div>
-
-      {/* СПИСОК СООБЩЕНИЙ */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '24px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px'
-      }}>
-        {chatMessages.length === 0 ? (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            color: 'var(--text-secondary)',
-            gap: '12px'
-          }}>
-            <div style={{ fontSize: '48px' }}>👋</div>
-            <div style={{ fontSize: '16px' }}>Начните общение!</div>
-          </div>
-        ) : (
-          chatMessages.map((message) => {
-            const isMyMessage = message.sender.id === user?.id;
-
-            return (
-              <div
-                key={message.id}
-                onMouseEnter={() => setHoveredMessageId(message.id)}
-                onMouseLeave={() => setHoveredMessageId(null)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: isMyMessage ? 'flex-end' : 'flex-start',
-                  gap: '4px'
-                }}
-              >
-                {/* Имя отправителя (для групповых чатов) */}
-                {!isMyMessage && activeChat.type === 'group' && (
-                  <div style={{
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color: 'var(--text-secondary)',
-                    marginLeft: '12px'
-                  }}>
-                    {message.sender.firstName} {message.sender.lastName}
-                    {message.sender.department && (
-                      <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '400', marginLeft: '8px' }}>
-                        {message.sender.department}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Ответ на сообщение */}
-                {message.replyTo && (
-                  <div style={{
-                    background: 'var(--bg-tertiary)',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    color: 'var(--text-secondary)',
-                    maxWidth: '70%',
-                    borderLeft: '3px solid var(--accent-primary)',
-                    marginBottom: '4px'
-                  }}>
-                    <div style={{ fontWeight: '600', marginBottom: '2px' }}>
-                      {message.replyTo.sender.firstName}
-                    </div>
-                    <div style={{ opacity: 0.8 }}>
-                      {message.replyTo.text.substring(0, 50)}
-                      {message.replyTo.text.length > 50 ? '...' : ''}
-                    </div>
-                  </div>
-                )}
-
-                {/* Само сообщение */}
-                <div style={{
-                  position: 'relative',
-                  maxWidth: '70%',
-                  padding: '12px 16px',
-                  background: isMyMessage 
-                    ? 'var(--accent-gradient)' 
-                    : 'var(--bg-primary)',
-                  color: isMyMessage ? 'white' : 'var(--text-primary)',
-                  borderRadius: isMyMessage ? '14px 4px 14px 14px' : '4px 14px 14px 14px',
-                  fontSize: '14px',
-                  lineHeight: '1.5',
-                  boxShadow: 'var(--shadow-sm)',
-                  wordBreak: 'break-word'
-                }}>
-                  <div>{message.text}</div>
-
-                  {/* Вложения */}
-                  {message.attachments && message.attachments.length > 0 && (
-                    <div style={{ marginTop: message.text ? '8px' : '0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {message.attachments.map((file: any, idx: number) => {
-                        const isFileObj = file instanceof File;
-                        const fileName = isFileObj ? file.name : (file.original_name || file.name || 'Файл');
-                        const mimeType = isFileObj ? file.type : (file.mime_type || file.type || '');
-                        const fileSize = file.size || 0;
-                        const isImage = mimeType.startsWith('image/');
-                        const icon = mimeType.includes('pdf') ? '📄'
-                          : mimeType.includes('word') || mimeType.includes('document') ? '📝'
-                          : mimeType.includes('sheet') || mimeType.includes('excel') ? '📊'
-                          : isImage ? '🖼️' : '📎';
-
-                        const getUrl = () => {
-                          if (!isFileObj && file.url) return file.url;
-                          if (isFileObj) return URL.createObjectURL(file);
-                          return '#';
-                        };
-
-                        if (isImage) {
-                          const url = getUrl();
-                          return (
-                            <img
-                              key={idx}
-                              src={url}
-                              alt={fileName}
-                              style={{
-                                maxWidth: '240px',
-                                maxHeight: '180px',
-                                borderRadius: '8px',
-                                objectFit: 'cover',
-                                display: 'block',
-                                cursor: 'pointer'
-                              }}
-                              onClick={() => window.open(url, '_blank')}
-                            />
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={idx}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '8px 12px',
-                              background: isMyMessage ? 'rgba(255,255,255,0.15)' : 'var(--bg-secondary)',
-                              borderRadius: '10px',
-                              cursor: 'pointer',
-                              maxWidth: '220px'
-                            }}
-                            onClick={() => {
-                              const url = getUrl();
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = fileName;
-                              a.click();
-                            }}
-                          >
-                            <span style={{ fontSize: '20px' }}>{icon}</span>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{
-                                fontSize: '13px',
-                                fontWeight: '600',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                color: isMyMessage ? 'white' : 'var(--text-primary)'
-                              }}>
-                                {fileName}
-                              </div>
-                              <div style={{ fontSize: '11px', opacity: 0.7 }}>
-                                {fileSize > 0 ? (fileSize / 1024).toFixed(0) + ' KB' : ''}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Время + статус */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    justifyContent: 'flex-end',
-                    marginTop: '4px'
-                  }}>
-                    {message.isEdited && (
-                      <span style={{ fontSize: '10px', opacity: 0.7 }}>изм.</span>
-                    )}
-                    <span style={{ fontSize: '11px', opacity: 0.7 }}>
-                      {formatTime(message.timestamp)}
-                    </span>
-                    {isMyMessage && (
-                      <span style={{ fontSize: '12px', opacity: 0.85 }}>
-                        {message.isRead ? '✓✓' : '✓'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Реакции */}
-                {message.reactions && message.reactions.length > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    gap: '4px',
-                    flexWrap: 'wrap',
-                    marginTop: '4px'
-                  }}>
-                    {message.reactions.map((reaction, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          padding: '2px 8px',
-                          background: 'var(--bg-primary)',
-                          borderRadius: '12px',
-                          fontSize: '14px',
-                          border: '1px solid var(--border-color)'
-                        }}
-                      >
-                        <span>{reaction.emoji}</span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          1
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Быстрые действия при наведении */}
-                {hoveredMessageId === message.id && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '-36px',
-                    [isMyMessage ? 'left' : 'right']: 0,
-                    display: 'flex',
-                    gap: '4px',
-                    background: 'var(--bg-primary)',
-                    borderRadius: '12px',
-                    padding: '4px 6px',
-                    boxShadow: 'var(--shadow-md)',
-                    border: '1px solid var(--border-color)',
-                    zIndex: 10
-                  }}>
-                    <button
-                      onClick={() => setReplyingTo(message)}
-                      style={{
-                        fontSize: '14px',
-                        border: 'none',
-                        background: 'transparent',
-                        cursor: 'pointer',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        color: 'var(--text-secondary)'
-                      }}
-                      title="Ответить"
-                    >
-                      ↩
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-    </div>
+      {children}
+    </ChatContext.Provider>
   );
 };
 
-export default MessageList;
+export const useChat = () => {
+  const context = useContext(ChatContext);
+  if (!context) throw new Error('useChat must be used within ChatProvider');
+  return context;
+};
