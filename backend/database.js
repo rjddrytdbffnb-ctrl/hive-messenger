@@ -2,30 +2,28 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 
+// ИСПРАВЛЕНО: используем DATABASE_URL для Railway
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'corp_messenger',
-  password: process.env.DB_PASSWORD || '0000',
-  port: process.env.DB_PORT || 5432,
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' 
+    ? { rejectUnauthorized: false } 
+    : false,
   // Настройки пула подключений
-  max: 20, // максимум подключений
+  max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000, // Увеличено для Railway
 });
 
 // Обработка ошибок пула
 pool.on('error', (err, client) => {
   console.error('❌ Неожиданная ошибка PostgreSQL:', err);
-  process.exit(-1);
 });
 
 // Проверка подключения при старте
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error('❌ Ошибка подключения к PostgreSQL:', err.message);
-    console.error('   Проверьте настройки в .env файле');
-    process.exit(1);
+    console.error('   Проверьте переменную DATABASE_URL');
   } else {
     console.log('✅ PostgreSQL подключена успешно!');
     console.log(`   📅 Время сервера БД: ${res.rows[0].now}`);
@@ -53,7 +51,10 @@ async function runMigrations() {
         console.log(`   ✅ ${file}`);
       } catch (err) {
         console.error(`   ❌ Ошибка в ${file}:`, err.message);
-        throw err;
+        // Не прерываем если таблицы уже существуют
+        if (!err.message.includes('already exists')) {
+          throw err;
+        }
       }
     }
     
@@ -62,7 +63,7 @@ async function runMigrations() {
     if (err.code === 'ENOENT') {
       console.log('ℹ️  Папка migrations не найдена, пропускаем миграции\n');
     } else {
-      throw err;
+      console.error('❌ Ошибка миграций:', err.message);
     }
   }
 }
