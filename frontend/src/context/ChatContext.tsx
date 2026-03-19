@@ -290,8 +290,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           m => m.id.startsWith('temp_') && m.chatId === chatId && m.sender.id === newMsg.sender.id
         );
         if (tempIdx !== -1) {
+          const tempMsg = prev[tempIdx];
           const updated = [...prev];
-          updated[tempIdx] = newMsg;
+          // Сохраняем attachments из temp_ если сервер не вернул их в socket
+          updated[tempIdx] = {
+            ...newMsg,
+            attachments: newMsg.attachments && newMsg.attachments.length > 0
+              ? newMsg.attachments
+              : tempMsg.attachments,
+          };
           return updated;
         }
         return [...prev, newMsg];
