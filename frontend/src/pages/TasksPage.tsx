@@ -90,14 +90,45 @@ const INITIAL_TASKS: Task[] = [
   },
 ];
 
-function loadTasks(): Task[] {
-  try {
-    const s = localStorage.getItem('corp_tasks');
-    return s ? JSON.parse(s) : INITIAL_TASKS;
-  } catch { return INITIAL_TASKS; }
+const API_BASE = process.env.REACT_APP_API_URL || '';
+
+async function apiFetch(path: string, options?: RequestInit) {
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...options?.headers }
+  });
+  return res.json();
 }
-function saveTasks(tasks: Task[]) {
-  try { localStorage.setItem('corp_tasks', JSON.stringify(tasks)); } catch {}
+
+function mapTask(t: any, myName: string, myId: string, myAvatar: string): Task {
+  const an = t.assigned_user ? `${t.assigned_user.first_name} ${t.assigned_user.last_name}` : t.assignedTo || '';
+  const cn = t.creator ? `${t.creator.first_name} ${t.creator.last_name}` : t.assignedBy || myName;
+  return {
+    id: String(t.id),
+    title: t.title,
+    description: t.description || '',
+    assignedTo: an,
+    assignedToId: String(t.assigned_to || t.assignedToId || ''),
+    assignedToAvatar: an ? an.split(' ').map((w:string)=>w[0]).join('').slice(0,2) : '??',
+    assignedBy: cn,
+    assignedById: String(t.created_by || t.assignedById || myId),
+    assignedByAvatar: cn ? cn.split(' ').map((w:string)=>w[0]).join('').slice(0,2) : '??',
+    status: t.status || 'pending',
+    priority: t.priority || 'medium',
+    dueDate: t.due_date ? t.due_date.slice(0,10) : t.dueDate || '',
+    createdAt: t.created_at ? new Date(t.created_at).toLocaleString('ru-RU') : t.createdAt || '',
+    isCompleted: t.status === 'done' || t.status === 'completed' || t.isCompleted || false,
+    files: t.files || [],
+    comments: (t.comments || []).map((c:any) => ({
+      id: String(c.id),
+      author: c.author ? `${c.author.first_name} ${c.author.last_name}` : c.author || '',
+      authorAvatar: c.author ? `${c.author.first_name[0]}${c.author.last_name[0]}` : '??',
+      text: c.text,
+      date: c.created_at ? new Date(c.created_at).toLocaleDateString('ru-RU') : c.date || '',
+      time: c.created_at ? new Date(c.created_at).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : c.time || '',
+    })),
+  };
 }
 
 // ─── ГЛАВНЫЙ КОМПОНЕНТ ─────────────────────────────────────────────────────
@@ -109,10 +140,22 @@ const TasksPage: React.FC = () => {
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [view, setView] = useState<'my' | 'inbox'>('my');
-  const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedExecutor, setSelectedExecutor] = useState<TaskUser | null>(null);
   const [deptFilter, setDeptFilter] = useState<string>('all');
   const [executors, setExecutors] = useState<TaskUser[]>([]);
+
+  // Загружаем задачи с сервера
+  useEffect(() => {
+    apiFetch('/api/tasks').then(data => {
+      if (data.tasks) {
+        const mapped = data.tasks.map((t: any) => mapTask(t, myName, myId, myAvatar));
+        setTasks(mapped);
+      }
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [myId]);
 
   // Загружаем реальных пользователей с сервера
   useEffect(() => {
@@ -144,7 +187,7 @@ const TasksPage: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => { saveTasks(tasks); }, [tasks]);
+
 
   useEffect(() => {
     if (selectedTask) {
@@ -153,9 +196,7 @@ const TasksPage: React.FC = () => {
     }
   }, [tasks]);
 
-  const setTasksAndSync = (updater: (prev: Task[]) => Task[]) => {
-    setTasks(prev => { const next = updater(prev); saveTasks(next); return next; });
-  };
+  const setTasksAndSync = (updater: (prev: Task[]) => Task[]) => { setTasks(prev => updater(prev)); };
 
   const updateTask = (updated: Task) => {
     setTasksAndSync(prev => prev.map(t => t.id === updated.id ? updated : t));
@@ -180,8 +221,17 @@ const TasksPage: React.FC = () => {
     ? myCreatedTasks.filter(t => t.assignedToId === selectedExecutor.id)
     : [];
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!newComment.trim() || !selectedTask) return;
+    try {
+      const token = localStorage.getItem('token');
+      const API_BASE = process.env.REACT_APP_API_URL || '';
+      await fetch(`${API_BASE}/api/tasks/${selectedTask.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ text: newComment.trim() })
+      });
+    } catch {}
     const comment: TaskComment = {
       id: Date.now().toString(),
       author: myName, authorAvatar: myAvatar,
@@ -193,13 +243,30 @@ const TasksPage: React.FC = () => {
     setNewComment('');
   };
 
-  const handleStatusChange = (status: Task['status']) => {
+  const handleStatusChange = async (status: Task['status']) => {
     if (!selectedTask) return;
+    try {
+      const token = localStorage.getItem('token');
+      const API_BASE = process.env.REACT_APP_API_URL || '';
+      await fetch(`${API_BASE}/api/tasks/${selectedTask.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ status })
+      });
+    } catch {}
     updateTask({ ...selectedTask, status, isCompleted: status === 'completed' });
   };
 
-  const handleDeleteTask = () => {
+  const handleDeleteTask = async () => {
     if (!selectedTask || !window.confirm('Удалить заявку?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const API_BASE = process.env.REACT_APP_API_URL || '';
+      await fetch(`${API_BASE}/api/tasks/${selectedTask.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    } catch {}
     setTasksAndSync(prev => prev.filter(t => t.id !== selectedTask.id));
     setSelectedTask(null);
     if (isMobile) setMobileScreen('tasks');
@@ -777,37 +844,55 @@ const RequestModal: React.FC<{
     return '📎';
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs: Record<string, string> = {};
     if (!executorId) errs.executor = 'Выберите исполнителя';
     if (!title.trim()) errs.title = 'Введите тему';
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
 
     const executor = executors.find(e => e.id === executorId)!;
-    const taskFiles: TaskFile[] = attachedFiles.map((f, i) => ({
-      id: `${Date.now()}_${i}`, name: f.name,
-      size: f.size > 1024 * 1024 ? (f.size / 1024 / 1024).toFixed(1) + ' MB' : (f.size / 1024).toFixed(0) + ' KB',
-      url: URL.createObjectURL(f), uploadedBy: currentUser.name, uploadedAt: new Date().toLocaleString('ru-RU')
-    }));
-
-    const newTask: Task = {
-      id: `task_${Date.now()}`, title: title.trim(),
-      description: description.trim() || 'Описание не указано',
-      assignedTo: executor.name, assignedToId: executor.id, assignedToAvatar: executor.avatar,
-      assignedBy: currentUser.name, assignedById: currentUser.id, assignedByAvatar: currentUser.avatar,
-      status: 'pending', priority, dueDate,
-      createdAt: new Date().toLocaleString('ru-RU'),
-      isCompleted: false, files: taskFiles,
-      comments: [{
-        id: Date.now().toString(), author: currentUser.name, authorAvatar: currentUser.avatar,
-        text: `Заявка создана и назначена исполнителю ${executor.name}`,
-        date: new Date().toLocaleDateString('ru-RU'),
-        time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-      }]
-    };
     setSubmitted(true);
-    pushNotification(`📋 Новая заявка: «${newTask.title}»`, `Исполнитель: ${newTask.assignedTo}`, 'task');
-    setTimeout(() => onSubmit(newTask), 1400);
+
+    try {
+      const token = localStorage.getItem('token');
+      const API_BASE = process.env.REACT_APP_API_URL || '';
+      const res = await fetch(`${API_BASE}/api/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || 'Описание не указано',
+          priority,
+          assigned_to: executor.id,
+          due_date: dueDate || null,
+        })
+      });
+      const data = await res.json();
+      if (data.task) {
+        const newTask: Task = {
+          id: String(data.task.id),
+          title: data.task.title,
+          description: data.task.description || '',
+          assignedTo: executor.name,
+          assignedToId: String(executor.id),
+          assignedToAvatar: executor.avatar,
+          assignedBy: currentUser.name,
+          assignedById: String(currentUser.id),
+          assignedByAvatar: currentUser.avatar,
+          status: 'pending',
+          priority,
+          dueDate: dueDate,
+          createdAt: new Date().toLocaleString('ru-RU'),
+          isCompleted: false,
+          files: [],
+          comments: [],
+        };
+        pushNotification(`📋 Новая заявка: «${newTask.title}»`, `Исполнитель: ${newTask.assignedTo}`, 'task');
+        setTimeout(() => onSubmit(newTask), 1400);
+      }
+    } catch (err) {
+      console.error('Ошибка создания задачи:', err);
+    }
   };
 
   const fieldStyle: React.CSSProperties = {
