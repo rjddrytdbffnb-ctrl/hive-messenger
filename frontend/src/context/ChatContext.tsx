@@ -135,10 +135,10 @@ function mapRawMessage(raw: any, chatId: string): Message {
     attachments: (raw.attachments && raw.attachments.length > 0)
       ? raw.attachments.map((f: any) => ({
           url: f.url,
-          original_name: f.original_name || f.filename || 'Файл',
-          name: f.original_name || f.filename || 'Файл',
-          mime_type: f.mime_type || '',
-          type: f.mime_type || '',
+          original_name: f.name || f.original_name || f.filename || 'Файл',
+          name: f.name || f.original_name || f.filename || 'Файл',
+          mime_type: f.mime_type || (f.type === 'image' ? 'image/jpeg' : 'application/octet-stream'),
+          type: f.mime_type || (f.type === 'image' ? 'image/jpeg' : 'application/octet-stream'),
           size: f.size || 0,
           id: f.id,
         }))
@@ -482,10 +482,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const serverAttachments = (serverMsg.attachments && serverMsg.attachments.length > 0)
         ? serverMsg.attachments.map((f: any) => ({
             url: f.url,
-            original_name: f.original_name || f.filename || 'Файл',
-            name: f.original_name || f.filename || 'Файл',
-            mime_type: f.mime_type || '',
-            type: f.mime_type || '',
+            original_name: f.name || f.original_name || f.filename || 'Файл',
+            name: f.name || f.original_name || f.filename || 'Файл',
+            mime_type: f.mime_type || (f.type === 'image' ? 'image/jpeg' : 'application/octet-stream'),
+            type: f.mime_type || (f.type === 'image' ? 'image/jpeg' : 'application/octet-stream'),
             size: f.size || 0,
             id: f.id,
           }))
