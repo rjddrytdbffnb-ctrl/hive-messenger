@@ -490,10 +490,17 @@ app.post('/api/chats/:chatId/messages/upload', authenticateToken, upload.array('
     for (const file of uploadedFiles) {
       const base64 = file.buffer.toString('base64');
       const dataUrl = `data:${file.mimetype};base64,${base64}`;
+      // Исправляем кодировку имени файла (multer может давать latin1 вместо utf8)
+      let originalName = file.originalname;
+      try {
+        originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        // Проверяем что декодирование дало читаемый результат
+        if (originalName.includes('�')) originalName = file.originalname;
+      } catch {}
       const { rows: frows } = await pool.query(
         `INSERT INTO files (message_id, filename, original_name, mime_type, size, url)
          VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-        [ins.rows[0].id, file.originalname, file.originalname, file.mimetype, file.size, dataUrl]
+        [ins.rows[0].id, originalName, originalName, file.mimetype, file.size, dataUrl]
       );
       savedFiles.push(frows[0]);
     }
