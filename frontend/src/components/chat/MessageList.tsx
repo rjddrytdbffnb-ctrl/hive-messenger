@@ -313,32 +313,26 @@ const MessageList: React.FC = () => {
                 {/* Быстрые действия при наведении */}
                 {hoveredMessageId === message.id && (
                   <div style={{
-                    position: 'absolute',
-                    top: '-36px',
-                    [isMyMessage ? 'left' : 'right']: 0,
                     display: 'flex',
                     gap: '4px',
-                    background: 'var(--bg-primary)',
-                    borderRadius: '12px',
-                    padding: '4px 6px',
-                    boxShadow: 'var(--shadow-md)',
-                    border: '1px solid var(--border-color)',
-                    zIndex: 10
+                    marginTop: '4px',
+                    justifyContent: isMyMessage ? 'flex-end' : 'flex-start',
                   }}>
                     <button
                       onClick={() => setReplyingTo(message)}
                       style={{
-                        fontSize: '14px',
-                        border: 'none',
-                        background: 'transparent',
+                        fontSize: '12px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-primary)',
                         cursor: 'pointer',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        color: 'var(--text-secondary)'
+                        padding: '3px 10px',
+                        borderRadius: '10px',
+                        color: 'var(--text-secondary)',
+                        boxShadow: 'var(--shadow-sm)',
                       }}
                       title="Ответить"
                     >
-                      ↩
+                      ↩ Ответить
                     </button>
                   </div>
                 )}
