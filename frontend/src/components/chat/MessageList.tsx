@@ -7,12 +7,15 @@ import { useAuth } from '../../context/AuthContext';
 const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, isMyMessage }) => {
   const isFileObj = file instanceof File;
   const fileName = isFileObj ? file.name : (file.name || file.original_name || file.filename || 'Файл');
-  // mime_type может быть полным ('image/jpeg') или коротким ('image')
   const mimeType = isFileObj ? file.type : (file.mime_type || '');
-  const fileType = isFileObj ? '' : (file.type || ''); // 'image' | 'file' | 'video'
+  const fileType = isFileObj ? '' : (file.type || '');
   const fileSize = file.size || 0;
-  // Проверяем оба варианта: полный mime и короткий тип
-  const isImage = mimeType.startsWith('image/') || fileType === 'image' || (file.url || '').startsWith('data:image/');
+  const fileUrl = isFileObj ? null : (file.url || '');
+  // Определяем тип: по mime, по type полю, или по содержимому url
+  const isImage = mimeType.startsWith('image/')
+    || fileType === 'image'
+    || fileUrl.startsWith('data:image/')
+    || (isFileObj && (file as File).type.startsWith('image/'));
 
   // Для серверных файлов используем url напрямую, для File объектов — создаём blob один раз
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
@@ -25,20 +28,20 @@ const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, i
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fileUrl = isFileObj ? (blobUrl || '#') : (file.url || '#');
+  const resolvedUrl = isFileObj ? (blobUrl || '#') : (file.url || '#');
 
   const icon = mimeType.includes('pdf') ? '📄'
     : mimeType.includes('word') || mimeType.includes('document') ? '📝'
     : mimeType.includes('sheet') || mimeType.includes('excel') ? '📊'
     : isImage ? '🖼️' : '📎';
 
-  if (isImage && fileUrl !== '#') {
+  if (isImage && resolvedUrl !== '#') {
     return (
       <img
-        src={fileUrl}
+        src={resolvedUrl}
         alt={fileName}
         style={{ maxWidth: '240px', maxHeight: '180px', borderRadius: '8px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
-        onClick={() => window.open(fileUrl, '_blank')}
+        onClick={() => window.open(resolvedUrl, '_blank')}
       />
     );
   }
@@ -52,7 +55,7 @@ const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, i
       }}
       onClick={() => {
         const a = document.createElement('a');
-        a.href = fileUrl;
+        a.href = resolvedUrl;
         a.download = fileName;
         a.click();
       }}
