@@ -6,10 +6,13 @@ import { useAuth } from '../../context/AuthContext';
 // Компонент для одного файла — создаёт blob URL один раз через useEffect
 const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, isMyMessage }) => {
   const isFileObj = file instanceof File;
-  const fileName = isFileObj ? file.name : (file.original_name || file.name || 'Файл');
-  const mimeType = isFileObj ? file.type : (file.mime_type || file.type || '');
+  const fileName = isFileObj ? file.name : (file.name || file.original_name || file.filename || 'Файл');
+  // mime_type может быть полным ('image/jpeg') или коротким ('image')
+  const mimeType = isFileObj ? file.type : (file.mime_type || '');
+  const fileType = isFileObj ? '' : (file.type || ''); // 'image' | 'file' | 'video'
   const fileSize = file.size || 0;
-  const isImage = mimeType.startsWith('image/');
+  // Проверяем оба варианта: полный mime и короткий тип
+  const isImage = mimeType.startsWith('image/') || fileType === 'image' || (file.url || '').startsWith('data:image/');
 
   // Для серверных файлов используем url напрямую, для File объектов — создаём blob один раз
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
