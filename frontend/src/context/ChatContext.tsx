@@ -244,7 +244,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const response = await messagesAPI.getByChat(activeChat.id);
         const mapped = response.data.messages.map((m: any) => mapRawMessage(m, activeChat.id));
         setMessages(prev => {
-          // Удаляем старые сообщения этого чата, добавляем новые
           const other = prev.filter(m => m.chatId !== activeChat.id);
           return [...other, ...mapped];
         });
