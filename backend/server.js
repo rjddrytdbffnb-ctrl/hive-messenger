@@ -391,12 +391,14 @@ app.get('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
           'is_online',  u.is_online
         ) AS sender,
         (SELECT json_agg(json_build_object(
-          'id',        f.id,
-          'url',       f.url,
-          'name',      f.original_name,
-          'type',      CASE WHEN f.mime_type LIKE 'image/%' THEN 'image' ELSE 'file' END,
-          'size',      f.size,
-          'mime_type', f.mime_type
+          'id',            f.id,
+          'url',           f.url,
+          'name',          f.original_name,
+          'original_name', f.original_name,
+          'filename',      f.filename,
+          'type',          CASE WHEN f.mime_type LIKE 'image/%' THEN 'image' ELSE 'file' END,
+          'size',          f.size,
+          'mime_type',     f.mime_type
         )) FROM files f WHERE f.message_id = m.id) AS attachments
       FROM messages m
       JOIN users u ON u.id = m.sender_id
@@ -490,12 +492,15 @@ app.post('/api/chats/:chatId/messages/upload', authenticateToken, upload.array('
     for (const file of uploadedFiles) {
       const base64 = file.buffer.toString('base64');
       const dataUrl = `data:${file.mimetype};base64,${base64}`;
-      // Исправляем кодировку имени файла (multer может давать latin1 вместо utf8)
+      // Исправляем кодировку имени файла
       let originalName = file.originalname;
       try {
-        originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-        // Проверяем что декодирование дало читаемый результат
-        if (originalName.includes('�')) originalName = file.originalname;
+        // Пробуем latin1->utf8 только если есть не-ASCII символы которые выглядят как кодировка
+        const decoded = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        // Используем декодированное только если оригинал содержит Ð (признак latin1 кириллицы)
+        if (file.originalname.includes('Ð') || file.originalname.includes('Ã')) {
+          originalName = decoded;
+        }
       } catch {}
       const { rows: frows } = await pool.query(
         `INSERT INTO files (message_id, filename, original_name, mime_type, size, url)
