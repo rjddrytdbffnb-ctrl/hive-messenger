@@ -137,8 +137,8 @@ function mapRawMessage(raw: any, chatId: string): Message {
           url: f.url,
           original_name: f.name || f.original_name || f.filename || 'Файл',
           name: f.name || f.original_name || f.filename || 'Файл',
-          mime_type: f.mime_type || (f.type === 'image' ? 'image/jpeg' : 'application/octet-stream'),
-          type: f.mime_type || (f.type === 'image' ? 'image/jpeg' : 'application/octet-stream'),
+          mime_type: f.mime_type || '',
+          type: f.type || '',
           size: f.size || 0,
           id: f.id,
         }))
@@ -483,8 +483,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             url: f.url,
             original_name: f.name || f.original_name || f.filename || 'Файл',
             name: f.name || f.original_name || f.filename || 'Файл',
-            mime_type: f.mime_type || (f.type === 'image' ? 'image/jpeg' : 'application/octet-stream'),
-            type: f.mime_type || (f.type === 'image' ? 'image/jpeg' : 'application/octet-stream'),
+            mime_type: f.mime_type || '',
+            type: f.type || '',
             size: f.size || 0,
             id: f.id,
           }))
