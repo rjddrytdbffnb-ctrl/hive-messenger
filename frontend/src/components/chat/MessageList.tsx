@@ -10,11 +10,11 @@ const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, i
   const mimeType = isFileObj ? file.type : (file.mime_type || '');
   const fileType = isFileObj ? '' : (file.type || '');
   const fileSize = file.size || 0;
-  const fileUrl = isFileObj ? null : (file.url || '');
+  const serverUrl = isFileObj ? '' : (file.url || '');
   // Определяем тип: по mime, по type полю, или по содержимому url
   const isImage = mimeType.startsWith('image/')
     || fileType === 'image'
-    || fileUrl.startsWith('data:image/')
+    || serverUrl.startsWith('data:image/')
     || (isFileObj && (file as File).type.startsWith('image/'));
 
   // Для серверных файлов используем url напрямую, для File объектов — создаём blob один раз
@@ -28,7 +28,7 @@ const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, i
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const resolvedUrl = isFileObj ? (blobUrl || '#') : (file.url || '#');
+  const resolvedUrl = isFileObj ? (blobUrl || '#') : (serverUrl || '#');
 
   const icon = mimeType.includes('pdf') ? '📄'
     : mimeType.includes('word') || mimeType.includes('document') ? '📝'
