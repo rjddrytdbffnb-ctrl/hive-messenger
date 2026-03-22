@@ -87,11 +87,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
 
-      // Сначала восстанавливаем из кэша чтобы не было моргания
-      const saved = localStorage.getItem('user');
-      if (saved) setUser(JSON.parse(saved));
-
-      // Пробуем обновить с сервера
+      // Всегда сначала загружаем актуальные данные с сервера
       try {
         const response = await authAPI.getProfile();
         const rawUser = response.data.user ?? response.data;
@@ -99,7 +95,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(freshUser);
         localStorage.setItem('user', JSON.stringify(freshUser));
       } catch {
-        // Сервер недоступен — остаёмся с кэшированными данными, не сбрасываем сессию
+        // Сервер недоступен — берём из кэша
+        const saved = localStorage.getItem('user');
+        if (saved) setUser(JSON.parse(saved));
       }
     } catch {
       localStorage.removeItem('token');
