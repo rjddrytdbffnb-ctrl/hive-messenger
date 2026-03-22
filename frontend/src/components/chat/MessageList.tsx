@@ -184,7 +184,7 @@ const MessageList: React.FC = () => {
           </div>
         ) : (
           chatMessages.map((message) => {
-            const isMyMessage = message.sender.id === user?.id;
+            const isMyMessage = String(message.sender.id) === String(user?.id);
 
             return (
               <div
