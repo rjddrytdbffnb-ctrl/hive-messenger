@@ -1,7 +1,7 @@
 {
   "name": "hive-messenger-backend",
   "version": "2.0.0",
-  "description": "Backend для корпоративного мессенджера Hive",
+  "description": "Backend \u0434\u043b\u044f \u043a\u043e\u0440\u043f\u043e\u0440\u0430\u0442\u0438\u0432\u043d\u043e\u0433\u043e \u043c\u0435\u0441\u0441\u0435\u043d\u0434\u0436\u0435\u0440\u0430 Hive",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -18,7 +18,7 @@
     "websocket",
     "real-time"
   ],
-  "author": "Андрей",
+  "author": "\u0410\u043d\u0434\u0440\u0435\u0439",
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -31,7 +31,8 @@
     "multer": "^1.4.5-lts.1",
     "pg": "^8.13.1",
     "socket.io": "^4.8.1",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "cloudinary": "^2.0.0"
   },
   "devDependencies": {
     "eslint": "^9.17.0",
