@@ -11,17 +11,45 @@ const { setupSocket } = require('./socketHandler');
 const { NotificationService } = require('./notificationService');
 
 const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
 const app    = express();
 const PORT   = process.env.PORT || 3000;
 const server = http.createServer(app);
 const io     = setupSocket(server);
 app.set('io', io);
 
-// Multer — хранение в памяти (Railway не имеет постоянного диска)
+// Cloudinary настройка
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dqkxlyskq',
+  api_key:    process.env.CLOUDINARY_API_KEY    || '429696497842135',
+  api_secret: process.env.CLOUDINARY_API_SECRET || 'b3mHdWoa6B64BTe8vcZUuwgUPyg',
+});
+
+// Multer — хранение в памяти
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
+
+// Загрузка файла в Cloudinary
+async function uploadToCloudinary(buffer, mimetype, originalname) {
+  return new Promise((resolve, reject) => {
+    const resourceType = mimetype.startsWith('image/') ? 'image' : mimetype.startsWith('video/') ? 'video' : 'raw';
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: resourceType,
+        folder: 'hive-messenger',
+        use_filename: true,
+        unique_filename: true,
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+    uploadStream.end(buffer);
+  });
+}
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
@@ -487,25 +515,32 @@ app.post('/api/chats/:chatId/messages/upload', authenticateToken, upload.array('
 
     await pool.query('UPDATE chats SET updated_at=NOW() WHERE id=$1', [chatId]);
 
-    // Сохраняем файлы в БД как ссылки (base64 data URL для Railway без диска)
+    // Загружаем файлы в Cloudinary и сохраняем URL в БД
     const savedFiles = [];
     for (const file of uploadedFiles) {
-      const base64 = file.buffer.toString('base64');
-      const dataUrl = `data:${file.mimetype};base64,${base64}`;
       // Исправляем кодировку имени файла
       let originalName = file.originalname;
       try {
-        // Пробуем latin1->utf8 только если есть не-ASCII символы которые выглядят как кодировка
         const decoded = Buffer.from(file.originalname, 'latin1').toString('utf8');
-        // Используем декодированное только если оригинал содержит Ð (признак latin1 кириллицы)
         if (file.originalname.includes('Ð') || file.originalname.includes('Ã')) {
           originalName = decoded;
         }
       } catch {}
+
+      let fileUrl = '';
+      try {
+        const result = await uploadToCloudinary(file.buffer, file.mimetype, originalName);
+        fileUrl = result.secure_url;
+      } catch (cloudErr) {
+        console.error('Cloudinary upload error:', cloudErr);
+        // Fallback — base64 если Cloudinary недоступен
+        fileUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+      }
+
       const { rows: frows } = await pool.query(
         `INSERT INTO files (message_id, filename, original_name, mime_type, size, url)
          VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-        [ins.rows[0].id, originalName, originalName, file.mimetype, file.size, dataUrl]
+        [ins.rows[0].id, originalName, originalName, file.mimetype, file.size, fileUrl]
       );
       savedFiles.push(frows[0]);
     }
@@ -690,16 +725,24 @@ app.delete('/api/tasks/:taskId/files/:fileId', authenticateToken, async (req, re
 app.post('/api/media', authenticateToken, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
-    const base64 = req.file.buffer.toString('base64');
-    const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
     const ext = req.file.originalname.split('.').pop()?.toLowerCase() || '';
-    const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
-    const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext);
+    const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext) || req.file.mimetype.startsWith('image/');
+    const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext) || req.file.mimetype.startsWith('video/');
     const fileType = isImage ? 'image' : isVideo ? 'video' : 'file';
+
+    let fileUrl = '';
+    try {
+      const result = await uploadToCloudinary(req.file.buffer, req.file.mimetype, req.file.originalname);
+      fileUrl = result.secure_url;
+    } catch (cloudErr) {
+      console.error('Cloudinary upload error:', cloudErr);
+      fileUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    }
+
     const { rows } = await pool.query(
       `INSERT INTO files (message_id, filename, original_name, mime_type, size, url)
        VALUES (NULL, $1, $2, $3, $4, $5) RETURNING id, original_name, mime_type, size, url, created_at`,
-      [req.file.originalname, req.file.originalname, req.file.mimetype, req.file.size, dataUrl]
+      [req.file.originalname, req.file.originalname, req.file.mimetype, req.file.size, fileUrl]
     );
     res.json({ file: { ...rows[0], type: fileType, uploader_id: req.user.id } });
   } catch (err) {
