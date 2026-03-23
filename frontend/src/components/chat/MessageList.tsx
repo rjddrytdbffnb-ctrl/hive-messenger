@@ -1,10 +1,12 @@
 // src/components/chat/MessageList.tsx
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import FileViewer from '../FileViewer';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 
 // Компонент для одного файла — создаёт blob URL один раз через useEffect
 const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, isMyMessage }) => {
+  const [viewerOpen, setViewerOpen] = React.useState(false);
   const isFileObj = file instanceof File;
   const fileName = isFileObj ? file.name : (file.name || file.original_name || file.filename || 'Файл');
   const mimeType = isFileObj ? file.type : (file.mime_type || '');
@@ -37,29 +39,47 @@ const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, i
 
   if (isImage && resolvedUrl !== '#') {
     return (
-      <img
-        src={resolvedUrl}
-        alt={fileName}
-        style={{ maxWidth: '240px', maxHeight: '180px', borderRadius: '8px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
-        onClick={() => window.open(resolvedUrl, '_blank')}
-      />
+      <>
+        {viewerOpen && (
+          <FileViewer
+            url={resolvedUrl}
+            name={fileName}
+            mimeType={mimeType}
+            type={fileType}
+            size={fileSize}
+            onClose={() => setViewerOpen(false)}
+          />
+        )}
+        <img
+          src={resolvedUrl}
+          alt={fileName}
+          style={{ maxWidth: '240px', maxHeight: '180px', borderRadius: '8px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
+          onClick={() => setViewerOpen(true)}
+        />
+      </>
     );
   }
 
   return (
-    <div
-      style={{
-        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-        background: isMyMessage ? 'rgba(255,255,255,0.15)' : 'var(--bg-secondary)',
-        borderRadius: '10px', cursor: 'pointer', maxWidth: '220px'
-      }}
-      onClick={() => {
-        const a = document.createElement('a');
-        a.href = resolvedUrl;
-        a.download = fileName;
-        a.click();
-      }}
-    >
+    <>
+      {viewerOpen && (
+        <FileViewer
+          url={resolvedUrl}
+          name={fileName}
+          mimeType={mimeType}
+          type={fileType}
+          size={fileSize}
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+          background: isMyMessage ? 'rgba(255,255,255,0.15)' : 'var(--bg-secondary)',
+          borderRadius: '10px', cursor: 'pointer', maxWidth: '220px'
+        }}
+        onClick={() => setViewerOpen(true)}
+      >
       <span style={{ fontSize: '20px' }}>{icon}</span>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: '13px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isMyMessage ? 'white' : 'var(--text-primary)' }}>
@@ -69,7 +89,8 @@ const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, i
           {fileSize > 0 ? (fileSize > 1024*1024 ? (fileSize/1024/1024).toFixed(1)+' MB' : Math.round(fileSize/1024)+' KB') : ''}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
