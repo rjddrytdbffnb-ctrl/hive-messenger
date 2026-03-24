@@ -776,17 +776,23 @@ app.get('/api/media', authenticateToken, async (req, res) => {
       LIMIT 100
     `, [req.user.id]);
 
-    // Ручные загрузки (message_id IS NULL)
+    // Ручные загрузки — только файлы загруженные текущим пользователем
+    // (файлы из чатов текущего пользователя у которых нет message_id — личные загрузки)
     const manualFiles = await pool.query(`
       SELECT f.id, f.original_name as name, f.mime_type, f.size, f.url, f.created_at,
-             NULL as first_name, NULL as last_name, 'manual' as source
+             u.first_name, u.last_name, 'manual' as source
       FROM files f
-      WHERE f.message_id IS NULL
+      JOIN messages m ON m.id = f.message_id
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.sender_id = $1
       ORDER BY f.created_at DESC
       LIMIT 100
-    `);
+    `, [req.user.id]);
 
-    const all = [...manualFiles.rows, ...chatFiles.rows, ...taskFiles.rows]
+    // Убираем дубли по id и сортируем
+    const seen = new Set();
+    const all = [...chatFiles.rows, ...taskFiles.rows, ...manualFiles.rows]
+      .filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; })
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 200);
 
