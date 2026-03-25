@@ -21,12 +21,12 @@ const SettingsPage: React.FC = () => {
   const { user } = useAuth();
   const { isDark } = useTheme();
   
-  const [settings, setSettings] = useState(loadSettings);
+  const [settings, setSettings] = useState<typeof DEFAULT_SETTINGS>(loadSettings);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'privacy' | 'sound'>('general');
 
   const handleToggle = (category: string, setting: string) => {
-    setSettings(prev => ({
+    setSettings((prev: typeof DEFAULT_SETTINGS) => ({
       ...prev,
       [category]: {
         ...(prev as any)[category],
