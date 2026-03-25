@@ -91,7 +91,7 @@ interface ChatContextType {
   editMessage: (messageId: string, newText: string) => void;
   forwardMessage: (messageId: string, chatIds: string[]) => void;
   createOrOpenChat: (employee: any) => string;
-  createGroupChat: (name: string, participants: User[]) => string;
+  createGroupChat: (name: string, participants: User[] | string[]) => string;
   muteChat: (chatId: string) => void;
   unmuteChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
@@ -321,6 +321,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             attachments: (newMsg.attachments && newMsg.attachments.length > 0)
               ? newMsg.attachments
               : tempMsg.attachments,
+            replyTo: newMsg.replyTo || tempMsg.replyTo,
           };
           return updated;
         }
@@ -328,13 +329,16 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Ищем сообщение с реальным id (HTTP уже заменил temp_) — обновляем attachments
         const realIdx = prev.findIndex(m => m.id === newMsg.id);
         if (realIdx !== -1) {
-          // Уже есть — обновляем attachments если в socket они есть
-          if (newMsg.attachments && newMsg.attachments.length > 0) {
-            const updated = [...prev];
-            updated[realIdx] = { ...prev[realIdx], attachments: newMsg.attachments };
-            return updated;
-          }
-          return prev;
+          // Уже есть — обновляем attachments если в socket они есть, сохраняем replyTo
+          const updated = [...prev];
+          updated[realIdx] = {
+            ...prev[realIdx],
+            attachments: (newMsg.attachments && newMsg.attachments.length > 0)
+              ? newMsg.attachments
+              : prev[realIdx].attachments,
+            replyTo: prev[realIdx].replyTo || newMsg.replyTo,
+          };
+          return updated;
         }
 
         return [...prev, newMsg];
@@ -575,8 +579,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return '';
   };
 
-  const createGroupChat = (name: string, participants: User[]): string => {
-    const ids = participants.map(p => p.id);
+  const createGroupChat = (name: string, participants: User[] | string[]): string => {
+    // Поддерживаем оба формата: User[] и string[]
+    const ids = participants.map((p: any) => typeof p === 'string' ? p : p.id);
     chatsAPI.create(name, 'group', ids).then(response => {
       const newChat = mapRawChat(response.data.chat, user?.id);
       newChat.participants = participants;
