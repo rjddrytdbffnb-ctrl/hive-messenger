@@ -1,6 +1,7 @@
 // src/components/chat/CreateGroupModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { usersAPI } from '../../services/api';
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -13,15 +14,30 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onClose, on
   const [groupName, setGroupName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<{ id: string; name: string; department: string; avatar: string }[]>([]);
 
-  // Моковые пользователи для выбора
-  const availableUsers = [
-    { id: '1', name: 'Алексей Иванов', department: 'IT', avatar: 'АИ' },
-    { id: '2', name: 'Мария Петрова', department: 'Marketing', avatar: 'МП' },
-    { id: '3', name: 'Дмитрий Сидоров', department: 'Sales', avatar: 'ДС' },
-    { id: '4', name: 'Елена Смирнова', department: 'HR', avatar: 'ЕС' },
-    { id: '5', name: 'Иван Козлов', department: 'IT', avatar: 'ИК' },
-  ];
+  // Загружаем реальных пользователей с сервера
+  useEffect(() => {
+    if (!isOpen) return;
+    usersAPI.getAll().then(res => {
+      const users = res.data?.users || res.data || [];
+      const mapped = users
+        .filter((u: any) => String(u.id) !== String(user?.id))
+        .map((u: any) => {
+          const firstName = u.first_name || u.firstName || '';
+          const lastName = u.last_name || u.lastName || '';
+          const fullName = `${firstName} ${lastName}`.trim() || u.username || 'Пользователь';
+          const initials = [firstName[0], lastName[0]].filter(Boolean).join('').toUpperCase() || '?';
+          return {
+            id: String(u.id),
+            name: fullName,
+            department: u.department || 'Other',
+            avatar: initials,
+          };
+        });
+      setAvailableUsers(mapped);
+    }).catch(() => {});
+  }, [isOpen, user?.id]);
 
   const filteredUsers = availableUsers.filter(u =>
     u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
