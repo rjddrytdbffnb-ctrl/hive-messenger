@@ -69,7 +69,7 @@ interface ChatContextType {
   chats: Chat[];
   activeChat: Chat | null;
   setActiveChat: (chat: Chat | null) => void;
-  sendMessage: (text: string, files?: any[]) => void;
+  sendMessage: (text: string, files?: any[], replyTo?: string) => void;
   replyingTo: Message | null;
   setReplyingTo: (message: Message | null) => void;
   isTyping: boolean;
@@ -338,6 +338,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ));
     });
 
+    // Новый чат (добавили в группу)
+    socket.on('new_chat', ({ chat }: any) => {
+      const newChat = mapRawChat(chat, user?.id);
+      setChats(prev => {
+        if (prev.some(c => c.id === newChat.id)) return prev;
+        return [newChat, ...prev];
+      });
+    });
+
     // Обновляем онлайн-статус в реальном времени
     socket.on('user_status_change', ({ userId, status }: { userId: string; status: string }) => {
       const isOnline = status === 'online';
@@ -404,7 +413,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [location.state]);
 
   // ── Отправка сообщения ─────────────────────────────────────────────────
-  const sendMessage = (text: string, files?: any[]) => {
+  const sendMessage = (text: string, files?: any[], replyTo?: string) => {
     if (!activeChat) return;
 
     // Боты — локально
@@ -482,7 +491,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (galleryFiles.length > 0) formData.append('gallery_files', JSON.stringify(galleryFiles));
           return messagesAPI.sendWithFile(currentChatId, formData);
         })()
-      : messagesAPI.send(currentChatId, text.trim());
+      : messagesAPI.send(currentChatId, text.trim(), replyTo);
 
     sendPromise.then(response => {
       const serverMsg = response.data.message;
