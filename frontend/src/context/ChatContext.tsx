@@ -584,7 +584,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const ids = participants.map((p: any) => typeof p === 'string' ? p : p.id);
     chatsAPI.create(name, 'group', ids).then(response => {
       const newChat = mapRawChat(response.data.chat, user?.id);
-      newChat.participants = participants;
+      // Если передали User[] — используем напрямую, иначе оставляем participants из ответа сервера
+      if (participants.length > 0 && typeof participants[0] !== 'string') {
+        newChat.participants = participants as User[];
+      }
       setChats(prev => [newChat, ...prev]);
       setActiveChat(newChat);
     }).catch(console.error);
