@@ -10,8 +10,26 @@ interface FileViewerProps {
   onClose: () => void;
 }
 
+const API_BASE = process.env.REACT_APP_API_URL || '';
+
 const FileViewer: React.FC<FileViewerProps> = ({ url, name, mimeType, type, size, onClose }) => {
   const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSaveToGallery = async () => {
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/api/media/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ url, name, mime_type: mimeType, size })
+      });
+      if (res.ok) setSaved(true);
+    } catch {}
+    setSaving(false);
+  };
 
   const mime = mimeType || '';
   const isImage = mime.startsWith('image/') || type === 'image' || url.startsWith('data:image/');
@@ -81,6 +99,18 @@ const FileViewer: React.FC<FileViewerProps> = ({ url, name, mimeType, type, size
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          <button
+            onClick={handleSaveToGallery}
+            disabled={saved || saving}
+            style={{
+              padding: '7px 14px', border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '8px', background: saved ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)',
+              color: 'white', fontSize: '13px', fontWeight: '600',
+              cursor: saved ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
+            }}
+          >
+            {saved ? '✅ Сохранено' : saving ? '⏳' : '🗂️ В галерею'}
+          </button>
           <button
             onClick={handleDownload}
             style={{
