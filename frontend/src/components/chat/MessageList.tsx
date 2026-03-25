@@ -1,11 +1,11 @@
 // src/components/chat/MessageList.tsx
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useChat } from '../../context/ChatContext';
+import { useAuth } from '../../context/AuthContext';
 import FileViewer from '../FileViewer';
 import { usersAPI } from '../../services/api';
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
-import { useChat } from '../../context/ChatContext';
-import { useAuth } from '../../context/AuthContext';
 
 // Компонент для одного файла — создаёт blob URL один раз через useEffect
 const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, isMyMessage }) => {
