@@ -4,29 +4,25 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 
+const DEFAULT_SETTINGS = {
+  notifications: { messages: true, mentions: true, groups: true, email: false },
+  privacy: { showOnlineStatus: true, readReceipts: true, lastSeen: true },
+  sound: { messageSound: true, callSound: true, volume: 70 }
+};
+
+function loadSettings() {
+  try {
+    const s = localStorage.getItem('hive_settings');
+    return s ? { ...DEFAULT_SETTINGS, ...JSON.parse(s) } : DEFAULT_SETTINGS;
+  } catch { return DEFAULT_SETTINGS; }
+}
+
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
   const { isDark } = useTheme();
   
-  const [settings, setSettings] = useState({
-    notifications: {
-      messages: true,
-      mentions: true,
-      groups: true,
-      email: false
-    },
-    privacy: {
-      showOnlineStatus: true,
-      readReceipts: true,
-      lastSeen: true
-    },
-    sound: {
-      messageSound: true,
-      callSound: true,
-      volume: 70
-    }
-  });
-
+  const [settings, setSettings] = useState(loadSettings);
+  const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'privacy' | 'sound'>('general');
 
   const handleToggle = (category: string, setting: string) => {
@@ -387,9 +383,13 @@ const SettingsPage: React.FC = () => {
                 transition: 'all 0.3s'
               }}
               className="hover-lift"
-              onClick={() => alert('Настройки сохранены!')}
+              onClick={() => {
+                try { localStorage.setItem('hive_settings', JSON.stringify(settings)); } catch {}
+                setSaved(true);
+                setTimeout(() => setSaved(false), 2000);
+              }}
             >
-              💾 Сохранить изменения
+              {saved ? '✅ Сохранено!' : '💾 Сохранить изменения'}
             </button>
           </div>
         </div>
