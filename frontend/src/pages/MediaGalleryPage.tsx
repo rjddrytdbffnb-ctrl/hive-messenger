@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '../context/ChatContext';
+import { useAuth } from '../context/AuthContext';
 import { MediaFile } from '../context/ChatContext';
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
@@ -9,6 +10,7 @@ const API_BASE = process.env.REACT_APP_API_URL || '';
 const MediaGalleryPage: React.FC = () => {
   const navigate = useNavigate();
   const { chats } = useChat();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'files'>('images');
   const [selectedItem, setSelectedItem] = useState<MediaFile | null>(null);
@@ -43,11 +45,13 @@ const MediaGalleryPage: React.FC = () => {
     }).catch(() => {});
   }, []);
 
-  // Собираем все mediaFiles из всех сообщений всех чатов
+  // Собираем mediaFiles только из сообщений текущего пользователя
   const chatMedia: MediaFile[] = [];
   chats.forEach(chat => {
     (chat.messages || []).forEach(msg => {
-      if (msg.mediaFiles) chatMedia.push(...msg.mediaFiles);
+      if (msg.mediaFiles && String(msg.sender?.id) === String(user?.id)) {
+        chatMedia.push(...msg.mediaFiles);
+      }
     });
   });
 
