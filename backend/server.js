@@ -284,8 +284,32 @@ app.post('/api/chats', authenticateToken, async (req, res) => {
       );
     }
 
-    io.emit('new_chat', { chat });
-    res.status(201).json({ chat });
+    // Загружаем полный чат с участниками
+    const { rows: fullChat } = await pool.query(`
+      SELECT c.*,
+        (SELECT json_agg(json_build_object(
+          'id', u.id, 'username', u.username,
+          'first_name', u.first_name, 'last_name', u.last_name,
+          'department', u.department, 'avatar', u.avatar, 'is_online', u.is_online
+        )) FROM chat_members cm2
+        JOIN users u ON u.id = cm2.user_id
+        WHERE cm2.chat_id = c.id) AS participants
+      FROM chats c WHERE c.id = $1
+    `, [chat.id]);
+
+    const chatWithParticipants = fullChat[0];
+
+    // Эмитим каждому участнику в его личную комнату
+    for (const uid of allIds) {
+      io.to(`user_${uid}`).emit('new_chat', { chat: chatWithParticipants });
+      // Добавляем в socket комнату чата
+      const sockets = await io.in(`user_${uid}`).fetchSockets();
+      for (const s of sockets) {
+        s.join(`chat_${chat.id}`);
+      }
+    }
+
+    res.status(201).json({ chat: chatWithParticipants });
   } catch (err) {
     console.error('Ошибка создания чата:', err);
     res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
