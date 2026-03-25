@@ -59,9 +59,10 @@ const MessageInput: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (text.trim() || attachedFiles.length > 0) {
-      sendMessage(text, attachedFiles);
+      sendMessage(text, attachedFiles, replyingTo?.id);
       setText('');
       setAttachedFiles([]);
+      setReplyingTo(null);
       setIsTyping(false);
     }
   };
