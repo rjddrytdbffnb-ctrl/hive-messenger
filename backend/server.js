@@ -752,51 +752,47 @@ app.post('/api/media', authenticateToken, upload.single('file'), async (req, res
 
 app.get('/api/media', authenticateToken, async (req, res) => {
   try {
-    // Файлы из чатов
-    const chatFiles = await pool.query(`
+    // Только файлы явно сохранённые в галерею текущим пользователем
+    const { rows } = await pool.query(`
       SELECT f.id, f.original_name as name, f.mime_type, f.size, f.url, f.created_at,
-             u.first_name, u.last_name, 'chat' as source
+             'gallery' as source
       FROM files f
-      JOIN messages m ON m.id = f.message_id
-      JOIN users u ON u.id = m.sender_id
-      JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = $1
+      WHERE f.message_id IS NULL
+        AND f.uploaded_by = $1
       ORDER BY f.created_at DESC
-      LIMIT 100
+      LIMIT 200
     `, [req.user.id]);
+    res.json({ files: rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
 
-    // Файлы из задач
-    const taskFiles = await pool.query(`
-      SELECT tf.id, tf.original_name as name, tf.mime_type, tf.size, tf.url, tf.created_at,
-             u.first_name, u.last_name, 'task' as source
-      FROM task_files tf
-      JOIN tasks t ON t.id = tf.task_id
-      JOIN users u ON u.id = tf.uploaded_by
-      WHERE t.assigned_to = $1 OR t.created_by = $1
-      ORDER BY tf.created_at DESC
-      LIMIT 100
-    `, [req.user.id]);
+// Сохранить файл из чата в галерею
+app.post('/api/media/save', authenticateToken, async (req, res) => {
+  try {
+    const { url, name, mime_type, size } = req.body;
+    if (!url) return res.status(400).json({ error: 'url обязателен' });
+    const { rows } = await pool.query(
+      `INSERT INTO files (message_id, filename, original_name, mime_type, size, url, uploaded_by)
+       VALUES (NULL, $1, $2, $3, $4, $5, $6)
+       RETURNING id, original_name as name, mime_type, size, url, created_at`,
+      [name || 'file', name || 'file', mime_type || '', size || 0, url, req.user.id]
+    );
+    res.json({ file: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
 
-    // Ручные загрузки — только файлы загруженные текущим пользователем
-    // (файлы из чатов текущего пользователя у которых нет message_id — личные загрузки)
-    const manualFiles = await pool.query(`
-      SELECT f.id, f.original_name as name, f.mime_type, f.size, f.url, f.created_at,
-             u.first_name, u.last_name, 'manual' as source
-      FROM files f
-      JOIN messages m ON m.id = f.message_id
-      JOIN users u ON u.id = m.sender_id
-      WHERE m.sender_id = $1
-      ORDER BY f.created_at DESC
-      LIMIT 100
-    `, [req.user.id]);
-
-    // Убираем дубли по id и сортируем
-    const seen = new Set();
-    const all = [...chatFiles.rows, ...taskFiles.rows, ...manualFiles.rows]
-      .filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; })
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 200);
-
-    res.json({ files: all });
+// Удалить файл из галереи
+app.delete('/api/media/:id', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM files WHERE id=$1 AND uploaded_by=$2 AND message_id IS NULL',
+      [req.params.id, req.user.id]
+    );
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
   }
@@ -846,6 +842,10 @@ app.put('/api/notifications/:id/read', authenticateToken, async (req, res) => {
 async function start() {
   try {
     await runMigrations();
+    // Добавляем uploaded_by в files если нет
+    try {
+      await pool.query(`ALTER TABLE files ADD COLUMN IF NOT EXISTS uploaded_by INTEGER REFERENCES users(id)`);
+    } catch {}
     server.listen(PORT, () => {
       console.log('══════════════════════════════════════');
       console.log('🐝 HIVE MESSENGER запущен!');
