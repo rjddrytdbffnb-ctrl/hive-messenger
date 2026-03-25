@@ -242,7 +242,7 @@ const ImageCard: React.FC<{ item: MediaFile; onClick: () => void; onDelete?: () 
 };
 
 // ─── VideoCard ────────────────────────────────────────────────
-const VideoCard: React.FC<{ item: MediaFile; onClick: () => void }> = ({ item, onClick }) => {
+const VideoCard: React.FC<{ item: MediaFile; onClick: () => void; onDelete?: () => void }> = ({ item, onClick, onDelete }) => {
   const [hovered, setHovered] = useState(false);
   return (
     <div onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
