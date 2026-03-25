@@ -17,6 +17,18 @@ const MediaGalleryPage: React.FC = () => {
   const [manualFiles, setManualFiles] = useState<MediaFile[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  const handleDelete = async (fileId: string) => {
+    if (!window.confirm('Удалить из галереи?')) return;
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`${API_BASE}/api/media/${fileId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setManualFiles(prev => prev.filter(f => f.id !== fileId));
+    } catch {}
+  };
+
   // Загружаем файлы с сервера при монтировании
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -185,15 +197,15 @@ const MediaGalleryPage: React.FC = () => {
           </div>
         ) : activeTab === 'images' ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px' }}>
-            {filtered.map(item => <ImageCard key={item.id} item={item} onClick={() => setSelectedItem(item)} />)}
+            {filtered.map(item => <ImageCard key={item.id} item={item} onClick={() => setSelectedItem(item)} onDelete={() => handleDelete(item.id)} />)}
           </div>
         ) : activeTab === 'videos' ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
-            {filtered.map(item => <VideoCard key={item.id} item={item} onClick={() => setSelectedItem(item)} />)}
+            {filtered.map(item => <VideoCard key={item.id} item={item} onClick={() => setSelectedItem(item)} onDelete={() => handleDelete(item.id)} />)}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {filtered.map(item => <FileCard key={item.id} item={item} onClick={() => setSelectedItem(item)} />)}
+            {filtered.map(item => <FileCard key={item.id} item={item} onClick={() => setSelectedItem(item)} onDelete={() => handleDelete(item.id)} />)}
           </div>
         )}
       </div>
@@ -204,11 +216,15 @@ const MediaGalleryPage: React.FC = () => {
 };
 
 // ─── ImageCard ────────────────────────────────────────────────
-const ImageCard: React.FC<{ item: MediaFile; onClick: () => void }> = ({ item, onClick }) => {
+const ImageCard: React.FC<{ item: MediaFile; onClick: () => void; onDelete?: () => void }> = ({ item, onClick, onDelete }) => {
   const [hovered, setHovered] = useState(false);
   return (
-    <div onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
       style={{ aspectRatio: '4/3', borderRadius: '14px', overflow: 'hidden', cursor: 'pointer', position: 'relative', boxShadow: hovered ? '0 8px 24px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)', transition: 'all 0.2s', transform: hovered ? 'scale(1.02)' : 'scale(1)' }}>
+      {onDelete && hovered && (
+        <button onClick={e => { e.stopPropagation(); onDelete(); }} style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 5, width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(239,68,68,0.9)', border: 'none', color: 'white', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+      )}
+      <div onClick={onClick} style={{ width: '100%', height: '100%' }}>
       {item.url !== '#' ? (
         <img src={item.url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s', transform: hovered ? 'scale(1.06)' : 'scale(1)' }} />
       ) : (
@@ -220,6 +236,7 @@ const ImageCard: React.FC<{ item: MediaFile; onClick: () => void }> = ({ item, o
           <div style={{ fontSize: '11px', opacity: 0.85 }}>{item.sender} · {item.date}</div>
         </div>
       )}
+      </div>
     </div>
   );
 };
@@ -243,11 +260,15 @@ const VideoCard: React.FC<{ item: MediaFile; onClick: () => void }> = ({ item, o
 };
 
 // ─── FileCard ─────────────────────────────────────────────────
-const FileCard: React.FC<{ item: MediaFile; onClick: () => void }> = ({ item, onClick }) => {
+const FileCard: React.FC<{ item: MediaFile; onClick: () => void; onDelete?: () => void }> = ({ item, onClick, onDelete }) => {
   const [hovered, setHovered] = useState(false);
   const icon = item.name.endsWith('.pdf') ? '📄' : item.name.match(/\.docx?$/) ? '📝' : item.name.match(/\.xlsx?$/) ? '📊' : item.name.match(/\.(zip|rar)$/) ? '🗜️' : '📎';
   return (
-    <div onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ position: 'relative' }}>
+      {onDelete && hovered && (
+        <button onClick={e => { e.stopPropagation(); onDelete(); }} style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 5, width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(239,68,68,0.9)', border: 'none', color: 'white', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+      )}
+    <div onClick={onClick}
       style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', border: '1px solid var(--border-color)', boxShadow: hovered ? '0 4px 14px rgba(0,0,0,0.09)' : '0 1px 4px rgba(0,0,0,0.05)', transition: 'all 0.2s', cursor: 'pointer', transform: hovered ? 'translateY(-1px)' : 'translateY(0)' }}>
       <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #667eea, #764ba2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>{icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
