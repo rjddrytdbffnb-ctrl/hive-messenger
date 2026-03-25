@@ -98,7 +98,7 @@ const MessageList: React.FC = () => {
   const { activeChat, messages, setReplyingTo, replyingTo } = useChat();
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
 
   // Автопрокрутка вниз при новых сообщениях
   useEffect(() => {
@@ -210,8 +210,7 @@ const MessageList: React.FC = () => {
             return (
               <div
                 key={message.id}
-                onMouseEnter={() => setHoveredMessageId(message.id)}
-                onMouseLeave={() => setHoveredMessageId(null)}
+                onClick={() => setActiveMessageId(prev => prev === message.id ? null : message.id)}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -338,7 +337,7 @@ const MessageList: React.FC = () => {
                 )}
 
                 {/* Быстрые действия при наведении */}
-                {hoveredMessageId === message.id && (
+                {activeMessageId === message.id && (
                   <div style={{
                     display: 'flex',
                     gap: '4px',
