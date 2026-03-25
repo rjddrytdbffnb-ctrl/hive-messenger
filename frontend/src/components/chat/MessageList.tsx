@@ -1,6 +1,7 @@
 // src/components/chat/MessageList.tsx
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import FileViewer from '../FileViewer';
+import { usersAPI } from '../../services/api';
 import { useChat } from '../../context/ChatContext';
 import { useAuth } from '../../context/AuthContext';
 
