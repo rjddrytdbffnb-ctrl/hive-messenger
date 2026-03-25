@@ -442,6 +442,16 @@ app.get('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
           'avatar',     u.avatar,
           'is_online',  u.is_online
         ) AS sender,
+        CASE WHEN m.reply_to IS NOT NULL THEN (
+          SELECT json_build_object(
+            'id', rm.id, 'text', rm.text,
+            'sender', json_build_object(
+              'id', ru.id, 'first_name', ru.first_name, 'last_name', ru.last_name
+            )
+          ) FROM messages rm
+          JOIN users ru ON ru.id = rm.sender_id
+          WHERE rm.id = m.reply_to
+        ) ELSE NULL END AS reply_to_message,
         (SELECT json_agg(json_build_object(
           'id',            f.id,
           'url',           f.url,
@@ -523,6 +533,7 @@ app.post('/api/chats/:chatId/messages/upload', authenticateToken, upload.array('
   try {
     const { chatId } = req.params;
     const text = req.body.text?.trim() || '📎 Файл';
+    const reply_to = req.body.reply_to || null;
     const uploadedFiles = req.files || [];
 
     const member = await pool.query(
@@ -533,8 +544,8 @@ app.post('/api/chats/:chatId/messages/upload', authenticateToken, upload.array('
       return res.status(403).json({ error: 'Вы не участник этого чата' });
 
     const ins = await pool.query(
-      'INSERT INTO messages (chat_id, sender_id, text) VALUES ($1,$2,$3) RETURNING *',
-      [chatId, req.user.id, text]
+      'INSERT INTO messages (chat_id, sender_id, text, reply_to) VALUES ($1,$2,$3,$4) RETURNING *',
+      [chatId, req.user.id, text, reply_to]
     );
 
     await pool.query('UPDATE chats SET updated_at=NOW() WHERE id=$1', [chatId]);
