@@ -221,8 +221,8 @@ const ImageCard: React.FC<{ item: MediaFile; onClick: () => void; onDelete?: () 
   return (
     <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
       style={{ aspectRatio: '4/3', borderRadius: '14px', overflow: 'hidden', cursor: 'pointer', position: 'relative', boxShadow: hovered ? '0 8px 24px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)', transition: 'all 0.2s', transform: hovered ? 'scale(1.02)' : 'scale(1)' }}>
-      {onDelete && hovered && (
-        <button onClick={e => { e.stopPropagation(); onDelete(); }} style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 5, width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(239,68,68,0.9)', border: 'none', color: 'white', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+      {onDelete && (
+        <button onClick={e => { e.stopPropagation(); onDelete(); }} style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 5, width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(239,68,68,0.85)', border: 'none', color: 'white', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
       )}
       <div onClick={onClick} style={{ width: '100%', height: '100%' }}>
       {item.url !== '#' ? (
@@ -265,8 +265,8 @@ const FileCard: React.FC<{ item: MediaFile; onClick: () => void; onDelete?: () =
   const icon = item.name.endsWith('.pdf') ? '📄' : item.name.match(/\.docx?$/) ? '📝' : item.name.match(/\.xlsx?$/) ? '📊' : item.name.match(/\.(zip|rar)$/) ? '🗜️' : '📎';
   return (
     <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ position: 'relative' }}>
-      {onDelete && hovered && (
-        <button onClick={e => { e.stopPropagation(); onDelete(); }} style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 5, width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(239,68,68,0.9)', border: 'none', color: 'white', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+      {onDelete && (
+        <button onClick={e => { e.stopPropagation(); onDelete(); }} style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 5, width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(239,68,68,0.85)', border: 'none', color: 'white', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
       )}
     <div onClick={onClick}
       style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', border: '1px solid var(--border-color)', boxShadow: hovered ? '0 4px 14px rgba(0,0,0,0.09)' : '0 1px 4px rgba(0,0,0,0.05)', transition: 'all 0.2s', cursor: 'pointer', transform: hovered ? 'translateY(-1px)' : 'translateY(0)' }}>
