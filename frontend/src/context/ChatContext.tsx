@@ -132,6 +132,20 @@ function mapRawMessage(raw: any, chatId: string): Message {
     timestamp: raw.created_at || new Date().toISOString(),
     isRead: raw.is_read || false,
     reactions: [],
+    replyTo: raw.reply_to_message ? {
+      id: String(raw.reply_to_message.id),
+      chatId: String(chatId),
+      text: raw.reply_to_message.text || '',
+      sender: {
+        id: String(raw.reply_to_message.sender?.id || ''),
+        firstName: raw.reply_to_message.sender?.first_name || '',
+        lastName: raw.reply_to_message.sender?.last_name || '',
+        isOnline: false,
+      },
+      timestamp: '',
+      isRead: true,
+      reactions: [],
+    } : undefined,
     attachments: (raw.attachments && raw.attachments.length > 0)
       ? raw.attachments.map((f: any) => ({
           url: f.url,
@@ -484,6 +498,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const formData = new FormData();
           if (text.trim()) formData.append('text', text.trim());
           else formData.append('text', ' ');
+          if (replyTo) formData.append('reply_to', replyTo);
           // Добавляем только реальные File объекты
           files.forEach(f => { if (f instanceof File) formData.append('files', f); });
           // GalleryFile с url — добавляем как JSON
