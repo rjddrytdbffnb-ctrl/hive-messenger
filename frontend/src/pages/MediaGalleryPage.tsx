@@ -279,6 +279,7 @@ const FileCard: React.FC<{ item: MediaFile; onClick: () => void; onDelete?: () =
         Открыть
       </div>
     </div>
+    </div>
   );
 };
 
