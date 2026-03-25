@@ -507,7 +507,17 @@ app.post('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
           'last_name',  u.last_name,
           'avatar',     u.avatar,
           'is_online',  u.is_online
-        ) AS sender
+        ) AS sender,
+        CASE WHEN m.reply_to IS NOT NULL THEN (
+          SELECT json_build_object(
+            'id', rm.id, 'text', rm.text,
+            'sender', json_build_object(
+              'id', ru.id, 'first_name', ru.first_name, 'last_name', ru.last_name
+            )
+          ) FROM messages rm
+          JOIN users ru ON ru.id = rm.sender_id
+          WHERE rm.id = m.reply_to
+        ) ELSE NULL END AS reply_to_message
       FROM messages m
       JOIN users u ON u.id = m.sender_id
       WHERE m.id = $1
