@@ -233,7 +233,9 @@ const ContextMenuPopup: React.FC<{
     <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} onClick={onClose} />
       <div style={{
-        position: 'fixed', top: y, left: x,
+        position: 'fixed',
+        top: y + 220 > window.innerHeight ? Math.max(10, y - 220) : y,
+        left: Math.min(x, window.innerWidth - 210),
         background: 'var(--bg-primary)', borderRadius: '12px',
         boxShadow: 'var(--shadow-lg)', zIndex: 1000, minWidth: '200px',
         border: '1px solid var(--border-color)', padding: '4px 0'
