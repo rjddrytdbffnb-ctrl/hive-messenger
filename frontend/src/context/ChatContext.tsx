@@ -94,7 +94,7 @@ interface ChatContextType {
   createGroupChat: (name: string, participants: User[] | string[]) => string;
   muteChat: (chatId: string) => void;
   unmuteChat: (chatId: string) => void;
-  deleteChat: (chatId: string) => void;
+  deleteChat: (chatId: string) => Promise<void> | void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -483,6 +483,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       timestamp: new Date().toISOString(),
       isRead: false,
       reactions: [],
+      replyTo: replyTo ? replyingTo || undefined : undefined,
       attachments: files && files.length > 0 ? files.map((f: any) => {
         if (f instanceof File) return f;
         // GalleryFile — уже имеет url
@@ -601,7 +602,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const unarchiveChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isArchived: false } : c));
   const muteChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isMuted: true } : c));
   const unmuteChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isMuted: false } : c));
-  const deleteChat = (id: string) => {
+  const deleteChat = async (id: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const API_BASE = process.env.REACT_APP_API_URL || '';
+      await fetch(`${API_BASE}/api/chats/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    } catch {}
     setChats(p => p.filter(c => c.id !== id));
     setMessages(p => p.filter(m => m.chatId !== id));
     if (activeChat?.id === id) setActiveChat(null);
