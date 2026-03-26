@@ -400,6 +400,37 @@ app.post('/api/chats/:chatId/members', authenticateToken, async (req, res) => {
   }
 });
 
+// Удалить чат (покинуть или удалить полностью)
+app.delete('/api/chats/:chatId', authenticateToken, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    // Проверяем что пользователь участник
+    const member = await pool.query(
+      'SELECT role FROM chat_members WHERE chat_id=$1 AND user_id=$2',
+      [chatId, req.user.id]
+    );
+    if (!member.rows.length) return res.status(403).json({ error: 'Нет доступа' });
+
+    const chat = await pool.query('SELECT type, created_by FROM chats WHERE id=$1', [chatId]);
+    if (!chat.rows.length) return res.status(404).json({ error: 'Чат не найден' });
+
+    const isAdmin = member.rows[0].role === 'admin';
+    const isCreator = String(chat.rows[0].created_by) === String(req.user.id);
+    const isDirect = chat.rows[0].type === 'direct';
+
+    if (isDirect || (isAdmin && isCreator)) {
+      // Удаляем чат полностью
+      await pool.query('DELETE FROM chats WHERE id=$1', [chatId]);
+    } else {
+      // Просто покидаем чат
+      await pool.query('DELETE FROM chat_members WHERE chat_id=$1 AND user_id=$2', [chatId, req.user.id]);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
+
 app.delete('/api/chats/:chatId/members/:userId', authenticateToken, async (req, res) => {
   try {
     await pool.query(
