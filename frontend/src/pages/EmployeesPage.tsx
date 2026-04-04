@@ -82,7 +82,11 @@ const EmployeesPage: React.FC = () => {
 
   useEffect(() => {
     loadEmployees();
-  }, [user]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (user) loadEmployees();
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadEmployees = async () => {
     try {
