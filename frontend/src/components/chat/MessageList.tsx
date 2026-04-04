@@ -165,7 +165,7 @@ const MessageList: React.FC = () => {
     );
   }
 
-  const chatMessages = messages.filter(m => m.chatId === activeChat.id && !m.isDeleted);
+  const chatMessages = messages.filter(m => String(m.chatId) === String(activeChat.id) && !m.isDeleted);
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
