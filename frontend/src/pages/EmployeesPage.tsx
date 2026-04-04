@@ -89,14 +89,13 @@ const EmployeesPage: React.FC = () => {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadEmployees = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
     try {
       const { usersAPI } = await import('../services/api');
       const response = await usersAPI.getAll();
       const rawUsers = response.data?.users || (response.data as any) || [];
-
-      if (!Array.isArray(rawUsers) || rawUsers.length === 0) {
-        console.warn('Нет пользователей:', response.data);
-      }
+      console.log('Загружено сотрудников:', rawUsers.length);
 
       const mapped: Employee[] = rawUsers.map((u: any) => ({
         id: String(u.id),
