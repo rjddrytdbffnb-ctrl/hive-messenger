@@ -249,13 +249,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadChatsFromAPI = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return; // нет токена — не делаем запрос
     try {
       setLoading(true);
       const response = await chatsAPI.getAll();
-      const serverChats = response.data.chats.map((c: any) => mapRawChat(c, user?.id));
+      const serverChats = (response.data.chats || []).map((c: any) => mapRawChat(c, user?.id));
       setChats([...BOT_CHATS, ...serverChats]);
-    } catch (err) {
-      console.error('Ошибка загрузки чатов:', err);
+    } catch (err: any) {
+      console.error('Ошибка загрузки чатов:', err?.response?.status, err?.message);
     } finally {
       setLoading(false);
     }
