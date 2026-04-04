@@ -85,6 +85,7 @@ interface ChatContextType {
   unarchiveChat: (chatId: string) => void;
   loading: boolean;
   messages: Message[];
+  messagesError: string | null;
   addReaction: (messageId: string, emoji: string) => void;
   removeReaction: (messageId: string, emoji: string) => void;
   deleteMessage: (messageId: string) => Promise<void>;
@@ -285,20 +286,30 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // ── Загрузка сообщений при смене активного чата ───────────────────────
+  const [messagesError, setMessagesError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!activeChat) return;
     if (activeChat.id.startsWith('bot_')) return; // боты — локально
 
+    setMessagesError(null);
     const loadMessages = async () => {
       try {
+        const apiUrl = process.env.REACT_APP_API_URL || 'НЕ ЗАДАН — используется localhost!';
+        console.log('[ChatContext] Загрузка сообщений чата', activeChat.id, '| API:', apiUrl);
         const response = await messagesAPI.getByChat(activeChat.id);
-        const mapped = response.data.messages.map((m: any) => mapRawMessage(m, activeChat.id));
+        const msgs = response.data.messages || [];
+        console.log('[ChatContext] Получено сообщений:', msgs.length);
+        const mapped = msgs.map((m: any) => mapRawMessage(m, activeChat.id));
         setMessages(prev => {
           const other = prev.filter(m => m.chatId !== activeChat.id);
           return [...other, ...mapped];
         });
-      } catch (err) {
-        console.error('Ошибка загрузки сообщений:', err);
+      } catch (err: any) {
+        const status = err?.response?.status;
+        const detail = err?.message || 'неизвестная ошибка';
+        console.error('[ChatContext] Ошибка загрузки сообщений:', status, detail);
+        setMessagesError('Ошибка ' + (status || '') + ': ' + detail);
       }
     };
     loadMessages();
@@ -708,7 +719,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       replyingTo, setReplyingTo, isTyping, setIsTyping,
       markAsRead, searchQuery, setSearchQuery, filterType, setFilterType,
       pinChat, unpinChat, archiveChat, unarchiveChat,
-      loading, messages,
+      loading, messages, messagesError,
       addReaction, removeReaction, deleteMessage, editMessage, forwardMessage,
       createOrOpenChat, createGroupChat, muteChat, unmuteChat, deleteChat,
     }}>
