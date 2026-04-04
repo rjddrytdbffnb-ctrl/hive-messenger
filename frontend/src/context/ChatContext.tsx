@@ -87,8 +87,8 @@ interface ChatContextType {
   messages: Message[];
   addReaction: (messageId: string, emoji: string) => void;
   removeReaction: (messageId: string, emoji: string) => void;
-  deleteMessage: (messageId: string) => void;
-  editMessage: (messageId: string, newText: string) => void;
+  deleteMessage: (messageId: string) => Promise<void>;
+  editMessage: (messageId: string, newText: string) => Promise<void>;
   forwardMessage: (messageId: string, chatIds: string[]) => void;
   createOrOpenChat: (employee: any) => string;
   createGroupChat: (name: string, participants: User[] | string[]) => string;
@@ -409,7 +409,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }));
 
       // Обновляем активный чат чтобы шапка сразу изменилась
-      setActiveChat(prev => {
+      setActiveChatState(prev => {
         if (!prev) return prev;
         if (!prev.participants?.some(p => String(p.id) === uid)) return prev;
         return {
