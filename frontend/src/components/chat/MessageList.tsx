@@ -316,9 +316,6 @@ const MessageList: React.FC = () => {
               <>
                 <div style={{ fontSize: '48px' }}>👋</div>
                 <div style={{ fontSize: '16px' }}>Начните общение!</div>
-                <div style={{ fontSize: '11px', opacity: 0.5, fontFamily: 'monospace' }}>
-                  chatId: {activeChat.id} | всего: {messages.length} | этого чата: {messages.filter(m => m.chatId === activeChat.id).length} | str: {messages.filter(m => String(m.chatId) === String(activeChat.id)).length}
-                </div>
               </>
             )}
           </div>
