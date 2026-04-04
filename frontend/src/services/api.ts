@@ -18,12 +18,11 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Если токен протух — выкидываем на логин только для 401
-// 403 может быть «нет доступа к чату» — не сбрасываем сессию
+// Если токен протух — выкидываем на логин
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -52,6 +51,13 @@ export const authAPI = {
 export const usersAPI = {
   getAll: () =>
     api.get<{ users: User[] }>('/api/users'),
+
+  updateProfile: (data: { firstName?: string; lastName?: string; department?: string }) =>
+    api.put<{ user: User }>('/api/users/me', {
+      first_name: data.firstName,
+      last_name:  data.lastName,
+      department: data.department,
+    }),
 };
 
 // ============================================================
@@ -104,6 +110,12 @@ export const messagesAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     }),
 
+  delete: (messageId: string) =>
+    api.delete(`/api/messages/${messageId}`),
+
+  edit: (messageId: string, text: string) =>
+    api.put<{ success: boolean }>(`/api/messages/${messageId}`, { text }),
+
   getReactions: (messageId: string) =>
     api.get(`/api/messages/${messageId}/reactions`),
 };
@@ -120,6 +132,46 @@ export const notificationsAPI = {
 
   markAllAsRead: () =>
     api.put('/api/notifications/read-all'),
+};
+
+// ============================================================
+// TASKS API
+// ============================================================
+export const tasksAPI = {
+  getAll: () =>
+    api.get<{ tasks: any[] }>('/api/tasks'),
+
+  create: (data: {
+    title: string;
+    description?: string;
+    priority?: 'low' | 'medium' | 'high';
+    assigned_to?: string;
+    due_date?: string;
+  }) => api.post<{ task: any }>('/api/tasks', data),
+
+  update: (id: string, data: {
+    status?: string;
+    title?: string;
+    description?: string;
+    priority?: string;
+    assigned_to?: string;
+    due_date?: string;
+  }) => api.put<{ task: any }>(`/api/tasks/${id}`, data),
+
+  delete: (id: string) =>
+    api.delete(`/api/tasks/${id}`),
+
+  getComments: (taskId: string) =>
+    api.get<{ comments: any[] }>(`/api/tasks/${taskId}/comments`),
+
+  addComment: (taskId: string, text: string) =>
+    api.post<{ comment: any }>(`/api/tasks/${taskId}/comments`, { text }),
+
+  getFiles: (taskId: string) =>
+    api.get<{ files: any[] }>(`/api/tasks/${taskId}/files`),
+
+  deleteFile: (taskId: string, fileId: string) =>
+    api.delete(`/api/tasks/${taskId}/files/${fileId}`),
 };
 
 export default api;
