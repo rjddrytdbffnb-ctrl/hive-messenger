@@ -308,6 +308,9 @@ const MessageList: React.FC = () => {
           }}>
             <div style={{ fontSize: '48px' }}>👋</div>
             <div style={{ fontSize: '16px' }}>Начните общение!</div>
+            <div style={{ fontSize: '11px', opacity: 0.5, textAlign: 'center', fontFamily: 'monospace' }}>
+              chatId: {activeChat.id} | total msgs: {messages.length} | для этого чата: {messages.filter(m => m.chatId === activeChat.id).length}
+            </div>
           </div>
         ) : (
           chatMessages.map((message) => {
