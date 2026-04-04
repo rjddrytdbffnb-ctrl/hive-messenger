@@ -292,19 +292,29 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!activeChat) return;
     if (activeChat.id.startsWith('bot_')) return; // боты — локально
 
+    // FIX #1: захватываем ID до async чтобы избежать race condition
+    const currentChatId = activeChat.id;
+
     setMessagesError(null);
     const loadMessages = async () => {
       try {
         const apiUrl = process.env.REACT_APP_API_URL || 'НЕ ЗАДАН — используется localhost!';
-        console.log('[ChatContext] Загрузка сообщений чата', activeChat.id, '| API:', apiUrl);
-        const response = await messagesAPI.getByChat(activeChat.id);
+        console.log('[ChatContext] Загрузка сообщений чата', currentChatId, '| API:', apiUrl);
+        const response = await messagesAPI.getByChat(currentChatId);
         const msgs = response.data.messages || [];
         console.log('[ChatContext] Получено сообщений:', msgs.length);
-        const mapped = msgs.map((m: any) => mapRawMessage(m, activeChat.id));
+
+        // FIX #2: если пользователь переключил чат пока шёл запрос — игнорируем ответ
+        if (activeChatRef.current?.id !== currentChatId) {
+          console.log('[ChatContext] Чат сменился пока грузились сообщения — пропускаем');
+          return;
+        }
+
+        const mapped = msgs.map((m: any) => mapRawMessage(m, currentChatId));
         setMessages(prev => {
-          const other = prev.filter(m => String(m.chatId) !== String(activeChat.id));
+          const other = prev.filter(m => String(m.chatId) !== String(currentChatId));
           // Мержим серверные сообщения с теми что уже есть (от socket)
-          const existing = prev.filter(m => String(m.chatId) === String(activeChat.id));
+          const existing = prev.filter(m => String(m.chatId) === String(currentChatId));
           const existingIds = new Set(existing.map(m => m.id));
           const serverIds = new Set(mapped.map((m: any) => m.id));
           // Берём серверные + socket сообщения которых нет на сервере (новые temp_)
@@ -345,6 +355,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     socket.on('new_message', ({ message }: any) => {
+      // FIX #3: chatId всегда берём из самого объекта сообщения (число → строка)
       const chatId = String(message.chat_id);
       const newMsg: Message = mapRawMessage(message, chatId);
 
@@ -521,8 +532,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Реальный чат — оптимистичная отправка
     // Добавляем сообщение сразу с правильным sender чтобы оно показалось справа
-    // Это предотвращает race condition когда socket приходит раньше HTTP ответа
     const tempId = 'temp_' + Date.now();
+    // FIX #4: фиксируем ID чата до любых async операций
     const currentChatId = activeChat.id;
     const optimisticMsg: Message = {
       id: tempId,
