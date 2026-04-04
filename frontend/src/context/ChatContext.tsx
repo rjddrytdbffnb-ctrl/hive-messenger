@@ -1,5 +1,5 @@
-// src/context/ChatContext.tsx - РЕАЛЬНЫЙ API + SOCKET.IO
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+// src/context/ChatContext.tsx - ПОЛНОСТЬЮ ПЕРЕПИСАН: надёжная загрузка сообщений
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { useLocation } from 'react-router-dom';
 import { chatsAPI, messagesAPI } from '../services/api';
@@ -115,8 +115,6 @@ export function pushNotification(title: string, message: string, type: string) {
 
 // Маппинг сырого сообщения из API/сокета в Message
 function mapRawMessage(raw: any, chatId: string): Message {
-  // Бэкенд всегда возвращает объект sender: { id, username, first_name, last_name }
-  // raw.sender_id есть у POST-ответа, но id надо брать из sender объекта
   const sender = raw.sender || {};
   return {
     id: String(raw.id),
@@ -164,7 +162,6 @@ function mapRawMessage(raw: any, chatId: string): Message {
 // Маппинг чата из API
 function mapRawChat(raw: any, currentUserId?: string): Chat {
   const lm = raw.last_message;
-  // Для direct чата берём имя собеседника (не текущего пользователя)
   let chatName = raw.name || 'Чат';
   if (raw.type === 'direct' && raw.participants && currentUserId) {
     const other = raw.participants.find((p: any) => String(p.id) !== String(currentUserId));
@@ -187,7 +184,6 @@ function mapRawChat(raw: any, currentUserId?: string): Chat {
     isPinned: false,
     isArchived: false,
     isMuted: false,
-    // isOnline берём из участников (для direct чата — онлайн собеседника)
     isOnline: raw.participants
       ? (raw.participants as any[]).some((p: any) => p.is_online)
       : false,
@@ -228,112 +224,140 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [chats, setChats] = useState<Chat[]>(BOT_CHATS);
   const [activeChat, setActiveChatState] = useState<Chat | null>(null);
-
-  // Обёртка: при смене активного чата сохраняем id в localStorage
-  const setActiveChat = (chat: Chat | null) => {
-    setActiveChatState(chat);
-    if (chat) {
-      localStorage.setItem('activeChatId', chat.id);
-    } else {
-      localStorage.removeItem('activeChatId');
-    }
-  };
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
 
-  // Синхронизируем ref с state чтобы socket handler видел актуальный activeChat
+  // Счётчик загрузок — для отмены устаревших запросов сообщений
+  const msgLoadCounter = useRef(0);
+
+  // ── setActiveChat: обёртка, сразу обновляет и state и ref ─────────────
+  const setActiveChat = useCallback((chat: Chat | null) => {
+    activeChatRef.current = chat;          // ref — мгновенно
+    setActiveChatState(chat);              // state — через рендер
+    if (chat) {
+      localStorage.setItem('activeChatId', chat.id);
+    } else {
+      localStorage.removeItem('activeChatId');
+    }
+  }, []);
+
+  // Бэкап: синхронизируем ref если state поменялся через setActiveChatState напрямую
   useEffect(() => {
     activeChatRef.current = activeChat;
   }, [activeChat]);
 
-  // ── Загрузка чатов с сервера ──────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════
+  //  ЗАГРУЗКА ЧАТОВ — ЕДИНСТВЕННЫЙ useEffect, только когда user готов
+  // ══════════════════════════════════════════════════════════════════════
   useEffect(() => {
-    loadChatsFromAPI();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (user) loadChatsFromAPI();
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadChatsFromAPI = async () => {
+    if (!user?.id) return;                       // user ещё не загружен — ждём
     const token = localStorage.getItem('token');
-    if (!token) return; // нет токена — не делаем запрос
-    try {
-      setLoading(true);
-      const response = await chatsAPI.getAll();
-      const serverChats = (response.data.chats || []).map((c: any) => mapRawChat(c, user?.id));
-      const allChats = [...BOT_CHATS, ...serverChats];
-      setChats(allChats);
+    if (!token) return;
 
-      // Восстанавливаем последний активный чат после обновления страницы
-      const savedChatId = localStorage.getItem('activeChatId');
-      if (savedChatId) {
-        setActiveChatState(prev => {
-          if (prev) return prev; // уже выбран — не трогаем
+    let cancelled = false;
+
+    const loadChats = async () => {
+      try {
+        setLoading(true);
+        console.log('[ChatContext] Загрузка чатов, user.id:', user.id);
+
+        const response = await chatsAPI.getAll();
+        if (cancelled) return;
+
+        const serverChats = (response.data.chats || []).map((c: any) => mapRawChat(c, user.id));
+        const allChats = [...BOT_CHATS, ...serverChats];
+        setChats(allChats);
+
+        console.log('[ChatContext] Чаты загружены:', serverChats.length);
+
+        // Восстанавливаем последний активный чат
+        const savedChatId = localStorage.getItem('activeChatId');
+        if (savedChatId && !cancelled) {
           const found = allChats.find((c: Chat) => c.id === savedChatId);
-          return found || null;
-        });
+          console.log('[ChatContext] Восстановление чата:', savedChatId, found ? `→ ${found.name}` : '→ не найден');
+          if (found) {
+            activeChatRef.current = found;     // ref — мгновенно
+            setActiveChatState(prev => {
+              if (prev) return prev;           // уже был выбран — не трогаем
+              return found;
+            });
+          }
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          console.error('[ChatContext] Ошибка загрузки чатов:', err?.response?.status, err?.message);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (err: any) {
-      console.error('Ошибка загрузки чатов:', err?.response?.status, err?.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  // ── Загрузка сообщений при смене активного чата ───────────────────────
-  const [messagesError, setMessagesError] = useState<string | null>(null);
+    loadChats();
+    return () => { cancelled = true; };
+  }, [user?.id]);  // <── ЕДИНСТВЕННЫЙ триггер: user готов
 
+  // ══════════════════════════════════════════════════════════════════════
+  //  ЗАГРУЗКА СООБЩЕНИЙ — при смене activeChat.id
+  // ══════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!activeChat) return;
-    if (activeChat.id.startsWith('bot_')) return; // боты — локально
+    if (activeChat.id.startsWith('bot_')) return;
 
-    // FIX #1: захватываем ID до async чтобы избежать race condition
-    const currentChatId = activeChat.id;
+    const chatId = activeChat.id;
+    // Каждый новый вызов инкрементирует счётчик — предыдущие запросы "устаревают"
+    const loadId = ++msgLoadCounter.current;
 
     setMessagesError(null);
-    const loadMessages = async () => {
-      try {
-        const apiUrl = process.env.REACT_APP_API_URL || 'НЕ ЗАДАН — используется localhost!';
-        console.log('[ChatContext] Загрузка сообщений чата', currentChatId, '| API:', apiUrl);
-        const response = await messagesAPI.getByChat(currentChatId);
-        const msgs = response.data.messages || [];
-        console.log('[ChatContext] Получено сообщений:', msgs.length);
+    console.log('[ChatContext] ▶ Загрузка сообщений чата:', chatId, '| loadId:', loadId);
 
-        // FIX #2: если пользователь переключил чат пока шёл запрос — игнорируем ответ
-        if (activeChatRef.current?.id !== currentChatId) {
-          console.log('[ChatContext] Чат сменился пока грузились сообщения — пропускаем');
+    const load = async () => {
+      try {
+        const response = await messagesAPI.getByChat(chatId);
+        const msgs = response.data.messages || [];
+
+        // Если за время запроса пользователь переключил чат — пропускаем
+        if (msgLoadCounter.current !== loadId) {
+          console.log('[ChatContext] ✕ loadId', loadId, 'устарел → пропуск');
           return;
         }
 
-        const mapped = msgs.map((m: any) => mapRawMessage(m, currentChatId));
+        console.log('[ChatContext] ✓ Получено', msgs.length, 'сообщений для чата', chatId);
+
+        const mapped = msgs.map((m: any) => mapRawMessage(m, chatId));
+
         setMessages(prev => {
-          const other = prev.filter(m => String(m.chatId) !== String(currentChatId));
-          // Мержим серверные сообщения с теми что уже есть (от socket)
-          const existing = prev.filter(m => String(m.chatId) === String(currentChatId));
-          const existingIds = new Set(existing.map(m => m.id));
-          const serverIds = new Set(mapped.map((m: any) => m.id));
-          // Берём серверные + socket сообщения которых нет на сервере (новые temp_)
-          const socketOnly = existing.filter(m => m.id.startsWith('temp_') || !serverIds.has(m.id));
-          return [...other, ...mapped, ...socketOnly];
+          // Оставляем сообщения ДРУГИХ чатов нетронутыми
+          const otherMsgs = prev.filter(m => String(m.chatId) !== String(chatId));
+          // Сохраняем оптимистичные (temp_) которых нет на сервере
+          const serverIds = new Set(mapped.map((m: Message) => m.id));
+          const tempMsgs = prev.filter(
+            m => String(m.chatId) === String(chatId) && m.id.startsWith('temp_') && !serverIds.has(m.id)
+          );
+          return [...otherMsgs, ...mapped, ...tempMsgs];
         });
       } catch (err: any) {
+        if (msgLoadCounter.current !== loadId) return;
+
         const status = err?.response?.status;
         const detail = err?.message || 'неизвестная ошибка';
-        console.error('[ChatContext] Ошибка загрузки сообщений:', status, detail);
-        setMessagesError('Ошибка ' + (status || '') + ': ' + detail);
+        console.error('[ChatContext] ✕ Ошибка сообщений:', status, detail);
+        setMessagesError(`Ошибка ${status || ''}: ${detail}`);
       }
     };
-    loadMessages();
+
+    load();
   }, [activeChat?.id]);
 
-  // ── Socket.io ─────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════
+  //  SOCKET.IO
+  // ══════════════════════════════════════════════════════════════════════
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -355,15 +379,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     socket.on('new_message', ({ message }: any) => {
-      // FIX #3: chatId всегда берём из самого объекта сообщения (число → строка)
       const chatId = String(message.chat_id);
       const newMsg: Message = mapRawMessage(message, chatId);
 
       setMessages(prev => {
-        // Не дублируем если уже есть по реальному id
+        // Не дублируем
         if (prev.some(m => m.id === newMsg.id)) return prev;
 
-        // Ищем temp_ сообщение от того же отправителя
+        // Заменяем temp_ сообщение
         const tempIdx = prev.findIndex(
           m => m.id.startsWith('temp_') && m.chatId === chatId && m.sender.id === newMsg.sender.id
         );
@@ -373,24 +396,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           updated[tempIdx] = {
             ...newMsg,
             attachments: (newMsg.attachments && newMsg.attachments.length > 0)
-              ? newMsg.attachments
-              : tempMsg.attachments,
+              ? newMsg.attachments : tempMsg.attachments,
             replyTo: newMsg.replyTo || tempMsg.replyTo,
-          };
-          return updated;
-        }
-
-        // Ищем сообщение с реальным id (HTTP уже заменил temp_) — обновляем attachments
-        const realIdx = prev.findIndex(m => m.id === newMsg.id);
-        if (realIdx !== -1) {
-          // Уже есть — обновляем attachments если в socket они есть, сохраняем replyTo
-          const updated = [...prev];
-          updated[realIdx] = {
-            ...prev[realIdx],
-            attachments: (newMsg.attachments && newMsg.attachments.length > 0)
-              ? newMsg.attachments
-              : prev[realIdx].attachments,
-            replyTo: prev[realIdx].replyTo || newMsg.replyTo,
           };
           return updated;
         }
@@ -398,19 +405,19 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return [...prev, newMsg];
       });
 
+      // Обновляем sidebar
       setChats(prev => prev.map(c =>
         c.id === chatId
           ? {
               ...c,
               lastMessage: message.text || '',
               lastMessageTime: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-              unreadCount: c.id !== activeChatRef.current?.id ? (c.unreadCount || 0) + 1 : c.unreadCount,
+              unreadCount: chatId !== activeChatRef.current?.id ? (c.unreadCount || 0) + 1 : c.unreadCount,
             }
           : c
       ));
     });
 
-    // Новый чат (добавили в группу)
     socket.on('new_chat', ({ chat }: any) => {
       const newChat = mapRawChat(chat, user?.id);
       setChats(prev => {
@@ -419,12 +426,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
     });
 
-    // Обновляем онлайн-статус в реальном времени
     socket.on('user_status_change', ({ userId, status }: { userId: string; status: string }) => {
       const isOnline = status === 'online';
       const uid = String(userId);
 
-      // Обновляем список чатов
       setChats(prev => prev.map(c => {
         if (!c.participants?.some(p => String(p.id) === uid)) return c;
         return {
@@ -436,7 +441,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
       }));
 
-      // Обновляем активный чат чтобы шапка сразу изменилась
       setActiveChatState(prev => {
         if (!prev) return prev;
         if (!prev.participants?.some(p => String(p.id) === uid)) return prev;
@@ -449,7 +453,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
       });
 
-      // Уведомляем другие компоненты (EmployeesPage) через custom event
       window.dispatchEvent(new CustomEvent('user_status_change', {
         detail: { userId: uid, isOnline }
       }));
@@ -463,12 +466,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Socket ошибка:', err.message);
     });
 
-    // Удаление сообщения — убираем из списка
     socket.on('message_deleted', ({ messageId }: any) => {
       setMessages(prev => prev.filter(m => m.id !== String(messageId)));
     });
 
-    // Редактирование сообщения — обновляем текст
     socket.on('message_edited', ({ messageId, text }: any) => {
       setMessages(prev => prev.map(m =>
         m.id === String(messageId) ? { ...m, text, isEdited: true } : m
@@ -479,7 +480,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [user]);
+  }, [user?.id]);
 
   // Подключаемся к комнате нового активного чата
   useEffect(() => {
@@ -494,9 +495,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const emp = state.startChatWith;
     createOrOpenChat(emp);
     window.history.replaceState({}, document.title);
-  }, [location.state]);
+  }, [location.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Отправка сообщения ─────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════
+  //  ОТПРАВКА СООБЩЕНИЯ
+  // ══════════════════════════════════════════════════════════════════════
   const sendMessage = (text: string, files?: any[], replyTo?: string) => {
     if (!activeChat) return;
 
@@ -515,7 +518,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setTimeout(() => {
         const botId = activeChat.participants?.[0]?.id || 'bot';
         const replyObj = getSmartBotResponse(botId, text);
-        const reply = replyObj?.text || "...";
+        const reply = replyObj?.text || '...';
         const replyMsg: Message = {
           id: (Date.now() + 1).toString(),
           chatId: activeChat.id,
@@ -531,10 +534,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Реальный чат — оптимистичная отправка
-    // Добавляем сообщение сразу с правильным sender чтобы оно показалось справа
     const tempId = 'temp_' + Date.now();
-    // FIX #4: фиксируем ID чата до любых async операций
     const currentChatId = activeChat.id;
+
     const optimisticMsg: Message = {
       id: tempId,
       chatId: currentChatId,
@@ -552,10 +554,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       replyTo: replyTo ? replyingTo || undefined : undefined,
       attachments: files && files.length > 0 ? files.map((f: any) => {
         if (f instanceof File) return f;
-        // GalleryFile — уже имеет url
-        return { url: f.url, original_name: f.name, name: f.name, mime_type: f.type === 'image' ? 'image/jpeg' : 'application/octet-stream', type: f.type === 'image' ? 'image/jpeg' : 'application/octet-stream', size: f.size || 0 };
+        return {
+          url: f.url, original_name: f.name, name: f.name,
+          mime_type: f.type === 'image' ? 'image/jpeg' : 'application/octet-stream',
+          type: f.type === 'image' ? 'image/jpeg' : 'application/octet-stream',
+          size: f.size || 0,
+        };
       }) : undefined,
     };
+
     setMessages(prev => [...prev, optimisticMsg]);
     setChats(prev => prev.map(c =>
       c.id === currentChatId
@@ -563,16 +570,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         : c
     ));
 
-    // Если есть файлы — отправляем через multipart, иначе обычный JSON
     const sendPromise = (files && files.length > 0)
       ? (() => {
           const formData = new FormData();
           if (text.trim()) formData.append('text', text.trim());
           else formData.append('text', ' ');
           if (replyTo) formData.append('reply_to', replyTo);
-          // Добавляем только реальные File объекты
           files.forEach(f => { if (f instanceof File) formData.append('files', f); });
-          // GalleryFile с url — добавляем как JSON
           const galleryFiles = files.filter(f => !(f instanceof File) && f.url);
           if (galleryFiles.length > 0) formData.append('gallery_files', JSON.stringify(galleryFiles));
           return messagesAPI.sendWithFile(currentChatId, formData);
@@ -582,7 +586,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     sendPromise.then(response => {
       const serverMsg = response.data.message;
       const realId = String(serverMsg.id);
-      // Маппим attachments с сервера чтобы они не пропадали
       const serverAttachments = (serverMsg.attachments && serverMsg.attachments.length > 0)
         ? serverMsg.attachments.map((f: any) => ({
             url: f.url,
@@ -609,7 +612,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createOrOpenChat = (employee: any): string => {
     const empId = String(employee.id);
 
-    // Ищем существующий чат
     const existing = chats.find(c =>
       c.type === 'direct' && c.participants?.some(p => String(p.id) === empId)
     );
@@ -618,7 +620,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return existing.id;
     }
 
-    // Создаём через API
     chatsAPI.createDirect(empId).then(response => {
       const newChat = mapRawChat(response.data.chat, user?.id);
       newChat.participants = [employee];
@@ -626,7 +627,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setActiveChat(newChat);
       socketRef.current?.emit('join_chat', newChat.id);
     }).catch(() => {
-      // Fallback: локальный чат
       const localChat: Chat = {
         id: `local_${Date.now()}`,
         name: `${employee.firstName} ${employee.lastName}`,
@@ -647,11 +647,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const createGroupChat = (name: string, participants: User[] | string[]): string => {
-    // Поддерживаем оба формата: User[] и string[]
     const ids = participants.map((p: any) => typeof p === 'string' ? p : p.id);
     chatsAPI.create(name, 'group', ids).then(response => {
       const newChat = mapRawChat(response.data.chat, user?.id);
-      // Если передали User[] — используем напрямую, иначе оставляем participants из ответа сервера
       if (participants.length > 0 && typeof participants[0] !== 'string') {
         newChat.participants = participants as User[];
       }
@@ -661,6 +659,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return '';
   };
 
+  // ── Простые операции ──────────────────────────────────────────────────
   const markAsRead = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, unreadCount: 0 } : c));
   const pinChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isPinned: true } : c));
   const unpinChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isPinned: false } : c));
@@ -668,6 +667,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const unarchiveChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isArchived: false } : c));
   const muteChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isMuted: true } : c));
   const unmuteChat = (id: string) => setChats(p => p.map(c => c.id === id ? { ...c, isMuted: false } : c));
+
   const deleteChat = async (id: string) => {
     try {
       const token = localStorage.getItem('token');
@@ -701,18 +701,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const deleteMessage = async (messageId: string) => {
-    // Оптимистично убираем сразу
     setMessages(prev => prev.filter(m => m.id !== messageId));
     try {
       await messagesAPI.delete(messageId);
     } catch (err) {
       console.error('Ошибка удаления сообщения:', err);
-      // При ошибке — ничего не делаем, сообщение уже убрано локально
     }
   };
 
   const editMessage = async (messageId: string, newText: string) => {
-    // Оптимистично обновляем сразу
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m));
     try {
       await messagesAPI.edit(messageId, newText);
