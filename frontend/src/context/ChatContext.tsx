@@ -302,8 +302,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('[ChatContext] Получено сообщений:', msgs.length);
         const mapped = msgs.map((m: any) => mapRawMessage(m, activeChat.id));
         setMessages(prev => {
-          const other = prev.filter(m => m.chatId !== activeChat.id);
-          return [...other, ...mapped];
+          const other = prev.filter(m => String(m.chatId) !== String(activeChat.id));
+          // Мержим серверные сообщения с теми что уже есть (от socket)
+          const existing = prev.filter(m => String(m.chatId) === String(activeChat.id));
+          const existingIds = new Set(existing.map(m => m.id));
+          const serverIds = new Set(mapped.map((m: any) => m.id));
+          // Берём серверные + socket сообщения которых нет на сервере (новые temp_)
+          const socketOnly = existing.filter(m => m.id.startsWith('temp_') || !serverIds.has(m.id));
+          return [...other, ...mapped, ...socketOnly];
         });
       } catch (err: any) {
         const status = err?.response?.status;
