@@ -226,7 +226,17 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const activeChatRef = useRef<Chat | null>(null);
 
   const [chats, setChats] = useState<Chat[]>(BOT_CHATS);
-  const [activeChat, setActiveChat] = useState<Chat | null>(null);
+  const [activeChat, setActiveChatState] = useState<Chat | null>(null);
+
+  // Обёртка: при смене активного чата сохраняем id в localStorage
+  const setActiveChat = (chat: Chat | null) => {
+    setActiveChatState(chat);
+    if (chat) {
+      localStorage.setItem('activeChatId', chat.id);
+    } else {
+      localStorage.removeItem('activeChatId');
+    }
+  };
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -255,7 +265,18 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(true);
       const response = await chatsAPI.getAll();
       const serverChats = (response.data.chats || []).map((c: any) => mapRawChat(c, user?.id));
-      setChats([...BOT_CHATS, ...serverChats]);
+      const allChats = [...BOT_CHATS, ...serverChats];
+      setChats(allChats);
+
+      // Восстанавливаем последний активный чат после обновления страницы
+      const savedChatId = localStorage.getItem('activeChatId');
+      if (savedChatId) {
+        setActiveChatState(prev => {
+          if (prev) return prev; // уже выбран — не трогаем
+          const found = allChats.find((c: Chat) => c.id === savedChatId);
+          return found || null;
+        });
+      }
     } catch (err: any) {
       console.error('Ошибка загрузки чатов:', err?.response?.status, err?.message);
     } finally {
@@ -412,6 +433,18 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     socket.on('connect_error', (err) => {
       console.error('Socket ошибка:', err.message);
+    });
+
+    // Удаление сообщения — убираем из списка
+    socket.on('message_deleted', ({ messageId }: any) => {
+      setMessages(prev => prev.filter(m => m.id !== String(messageId)));
+    });
+
+    // Редактирование сообщения — обновляем текст
+    socket.on('message_edited', ({ messageId, text }: any) => {
+      setMessages(prev => prev.map(m =>
+        m.id === String(messageId) ? { ...m, text, isEdited: true } : m
+      ));
     });
 
     return () => {
@@ -639,11 +672,26 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     socketRef.current?.emit('remove_reaction', { messageId, emoji });
   };
 
-  const deleteMessage = (messageId: string) =>
-    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isDeleted: true, text: 'Сообщение удалено' } : m));
+  const deleteMessage = async (messageId: string) => {
+    // Оптимистично убираем сразу
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    try {
+      await messagesAPI.delete(messageId);
+    } catch (err) {
+      console.error('Ошибка удаления сообщения:', err);
+      // При ошибке — ничего не делаем, сообщение уже убрано локально
+    }
+  };
 
-  const editMessage = (messageId: string, newText: string) =>
+  const editMessage = async (messageId: string, newText: string) => {
+    // Оптимистично обновляем сразу
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m));
+    try {
+      await messagesAPI.edit(messageId, newText);
+    } catch (err) {
+      console.error('Ошибка редактирования сообщения:', err);
+    }
+  };
 
   const forwardMessage = (messageId: string, chatIds: string[]) => {
     const original = messages.find(m => m.id === messageId);
