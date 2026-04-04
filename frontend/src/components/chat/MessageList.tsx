@@ -306,21 +306,21 @@ const MessageList: React.FC = () => {
             color: 'var(--text-secondary)',
             gap: '12px'
           }}>
-            
             {messagesError ? (
               <>
                 <div style={{ fontSize: '48px' }}>⚠️</div>
                 <div style={{ fontSize: '16px', color: '#ef4444' }}>Ошибка загрузки сообщений</div>
                 <div style={{ fontSize: '12px', opacity: 0.7, fontFamily: 'monospace', maxWidth: '400px', textAlign: 'center', wordBreak: 'break-all' }}>{messagesError}</div>
-                <div style={{ fontSize: '12px', opacity: 0.6 }}>Убедитесь что REACT_APP_API_URL задан в Railway Variables</div>
               </>
             ) : (
               <>
                 <div style={{ fontSize: '48px' }}>👋</div>
                 <div style={{ fontSize: '16px' }}>Начните общение!</div>
+                <div style={{ fontSize: '11px', opacity: 0.5, fontFamily: 'monospace' }}>
+                  chatId: {activeChat.id} | всего: {messages.length} | этого чата: {messages.filter(m => m.chatId === activeChat.id).length} | str: {messages.filter(m => String(m.chatId) === String(activeChat.id)).length}
+                </div>
               </>
             )}
-          
           </div>
         ) : (
           chatMessages.map((message) => {
