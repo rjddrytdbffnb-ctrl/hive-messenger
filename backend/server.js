@@ -567,6 +567,62 @@ app.post('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
 
 
 // ============================================================
+// УДАЛЕНИЕ СООБЩЕНИЯ
+// ============================================================
+app.delete('/api/messages/:messageId', authenticateToken, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { rows } = await pool.query(
+      'SELECT * FROM messages WHERE id=$1',
+      [messageId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Сообщение не найдено' });
+    const msg = rows[0];
+    if (String(msg.sender_id) !== String(req.user.id))
+      return res.status(403).json({ error: 'Нет доступа' });
+
+    await pool.query('DELETE FROM messages WHERE id=$1', [messageId]);
+    const io = req.app.get('io');
+    io.to(`chat_${msg.chat_id}`).emit('message_deleted', { messageId: String(messageId), chatId: String(msg.chat_id) });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Ошибка удаления сообщения:', err);
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
+
+// ============================================================
+// РЕДАКТИРОВАНИЕ СООБЩЕНИЯ
+// ============================================================
+app.put('/api/messages/:messageId', authenticateToken, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'Текст не может быть пустым' });
+
+    const { rows } = await pool.query(
+      'SELECT * FROM messages WHERE id=$1',
+      [messageId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Сообщение не найдено' });
+    const msg = rows[0];
+    if (String(msg.sender_id) !== String(req.user.id))
+      return res.status(403).json({ error: 'Нет доступа' });
+
+    await pool.query(
+      'UPDATE messages SET text=$1, is_edited=true, updated_at=NOW() WHERE id=$2',
+      [text.trim(), messageId]
+    );
+    const io = req.app.get('io');
+    io.to(`chat_${msg.chat_id}`).emit('message_edited', { messageId: String(messageId), chatId: String(msg.chat_id), text: text.trim() });
+    res.json({ success: true, text: text.trim() });
+  } catch (err) {
+    console.error('Ошибка редактирования сообщения:', err);
+    res.status(500).json({ error: 'Ошибка сервера', detail: err.message });
+  }
+});
+
+// ============================================================
 // UPLOAD — загрузка файлов с сообщением
 // ============================================================
 
