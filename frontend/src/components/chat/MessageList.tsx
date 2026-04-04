@@ -98,7 +98,7 @@ const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, i
 };
 
 const MessageList: React.FC = () => {
-  const { activeChat, messages, setReplyingTo, replyingTo } = useChat();
+  const { activeChat, messages, messagesError, setReplyingTo, replyingTo } = useChat();
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
@@ -306,11 +306,21 @@ const MessageList: React.FC = () => {
             color: 'var(--text-secondary)',
             gap: '12px'
           }}>
-            <div style={{ fontSize: '48px' }}>👋</div>
-            <div style={{ fontSize: '16px' }}>Начните общение!</div>
-            <div style={{ fontSize: '11px', opacity: 0.5, textAlign: 'center', fontFamily: 'monospace' }}>
-              chatId: {activeChat.id} | total msgs: {messages.length} | для этого чата: {messages.filter(m => m.chatId === activeChat.id).length}
-            </div>
+            
+            {messagesError ? (
+              <>
+                <div style={{ fontSize: '48px' }}>⚠️</div>
+                <div style={{ fontSize: '16px', color: '#ef4444' }}>Ошибка загрузки сообщений</div>
+                <div style={{ fontSize: '12px', opacity: 0.7, fontFamily: 'monospace', maxWidth: '400px', textAlign: 'center', wordBreak: 'break-all' }}>{messagesError}</div>
+                <div style={{ fontSize: '12px', opacity: 0.6 }}>Убедитесь что REACT_APP_API_URL задан в Railway Variables</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: '48px' }}>👋</div>
+                <div style={{ fontSize: '16px' }}>Начните общение!</div>
+              </>
+            )}
+          
           </div>
         ) : (
           chatMessages.map((message) => {
