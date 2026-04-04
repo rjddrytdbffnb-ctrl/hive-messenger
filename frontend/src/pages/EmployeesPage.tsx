@@ -92,7 +92,11 @@ const EmployeesPage: React.FC = () => {
     try {
       const { usersAPI } = await import('../services/api');
       const response = await usersAPI.getAll();
-      const rawUsers = response.data.users;
+      const rawUsers = response.data?.users || (response.data as any) || [];
+
+      if (!Array.isArray(rawUsers) || rawUsers.length === 0) {
+        console.warn('Нет пользователей:', response.data);
+      }
 
       const mapped: Employee[] = rawUsers.map((u: any) => ({
         id: String(u.id),
