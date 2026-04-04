@@ -241,9 +241,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // ── Загрузка чатов с сервера ──────────────────────────────────────────
   useEffect(() => {
-    if (!user) return;
     loadChatsFromAPI();
-  }, [user]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (user) loadChatsFromAPI();
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadChatsFromAPI = async () => {
     try {
