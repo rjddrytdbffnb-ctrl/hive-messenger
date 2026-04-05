@@ -356,7 +356,7 @@ const EventModal: React.FC<{
           <div style={{ display: 'flex', gap: '10px', paddingTop: '4px' }}>
             <button onClick={onClose} style={{ flex: 1, padding: '11px', border: '1.5px solid var(--border-color)', borderRadius: '10px', background: 'transparent', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Отмена</button>
             <button onClick={handleSave} style={{ flex: 2, padding: '11px', border: 'none', borderRadius: '10px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', fontSize: '14px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(102,126,234,0.35)' }}>
-              {event ? '💾 Сохранить' : '✅ Создать событие'}
+              {event ? 'Сохранить' : 'Создать событие'}
             </button>
           </div>
         </div>
