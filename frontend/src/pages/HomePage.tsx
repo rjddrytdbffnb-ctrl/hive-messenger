@@ -50,20 +50,30 @@ const HomePage: React.FC = () => {
     return d.toISOString().split('T')[0];
   };
 
-  const [news, setNews] = useState([
+  const defaultNews = [
     { id: 1, title: 'Обновление системы мессенджера', content: 'Мы рады представить новую версию корпоративного мессенджера с улучшенным интерфейсом и повышенной производительностью.', author: 'IT отдел', date: daysAgo(0), category: 'Обновление', isImportant: true },
     { id: 2, title: 'Корпоративное мероприятие', content: 'Приглашаем всех сотрудников на ежегодное корпоративное мероприятие, которое состоится в эту пятницу в 18:00 в главном зале.', author: 'HR отдел', date: daysAgo(1), category: 'Событие', isImportant: true },
     { id: 3, title: 'Новые правила использования чата', content: 'Обращаем внимание на обновлённые правила использования корпоративного чата. Пожалуйста, ознакомьтесь с изменениями.', author: 'Администрация', date: daysAgo(3), category: 'Информация', isImportant: false },
     { id: 4, title: 'Запуск нового проекта', content: 'Компания начинает работу над новым крупным проектом. Подробности будут сообщены на собрании отделов.', author: 'Руководство', date: daysAgo(5), category: 'Проект', isImportant: true },
-  ]);
+  ];
+
+  const [news, setNews] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('corp_news');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return defaultNews;
+  });
 
   const [newPost, setNewPost] = useState({ title: '', content: '' });
 
   const handleAddNews = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPost.title.trim() && newPost.content.trim()) {
-      const newsItem = { id: news.length + 1, title: newPost.title, content: newPost.content, author: 'Вы', date: new Date().toISOString().split('T')[0], category: 'Новость', isImportant: false };
-      setNews([newsItem, ...news]);
+      const newsItem = { id: Date.now(), title: newPost.title, content: newPost.content, author: 'Вы', date: new Date().toISOString().split('T')[0], category: 'Новость', isImportant: false };
+      const updated = [newsItem, ...news];
+      setNews(updated);
+      try { localStorage.setItem('corp_news', JSON.stringify(updated)); } catch {}
       setNewPost({ title: '', content: '' });
     }
   };
@@ -74,7 +84,7 @@ const HomePage: React.FC = () => {
       <div style={{ backgroundColor: 'var(--bg-primary)', borderRadius: '10px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
         <h3 style={{ marginBottom: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            🔔 Уведомления
+            Уведомления
             {todayNotifications.filter((n: any) => !n.is_read).length > 0 && (
               <span style={{ background: '#ef4444', color: 'white', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '800' }}>
                 {todayNotifications.filter((n: any) => !n.is_read).length}
@@ -103,7 +113,7 @@ const HomePage: React.FC = () => {
       {/* Календарь */}
       <div style={{ backgroundColor: 'var(--bg-primary)', borderRadius: '10px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
         <h3 style={{ marginBottom: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>📅 Сегодня</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Сегодня</span>
           <button onClick={() => navigate('/calendar')} style={{ fontSize: '12px', fontWeight: '600', color: '#667eea', background: 'rgba(102,126,234,0.1)', border: 'none', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer' }}>
             Открыть →
           </button>
@@ -139,7 +149,7 @@ const HomePage: React.FC = () => {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ backgroundColor: 'var(--bg-primary)', borderRadius: '10px', padding: isMobile ? '16px' : '30px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
             <h1 style={{ marginBottom: '24px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', fontSize: isMobile ? '22px' : '28px' }}>
-              📰 Корпоративные новости
+              Корпоративные новости
             </h1>
 
             {/* Форма добавления новости */}
@@ -183,7 +193,7 @@ const HomePage: React.FC = () => {
                   <p style={{ color: 'var(--text-primary)', lineHeight: '1.6', marginBottom: '12px', fontSize: isMobile ? '14px' : '15px' }}>{item.content}</p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: '10px', flexWrap: 'wrap', gap: '6px' }}>
                     <span>👤 {item.author}</span>
-                    <span>📅 {(() => {
+                    <span>{(() => {
                       const diff = Math.round((new Date().setHours(0,0,0,0) - new Date(item.date).setHours(0,0,0,0)) / 86400000);
                       if (diff === 0) return 'Сегодня';
                       if (diff === 1) return 'Вчера';
