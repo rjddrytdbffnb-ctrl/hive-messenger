@@ -110,7 +110,7 @@ const ProfilePage: React.FC = () => {
             boxShadow: '0 4px 15px rgba(16,185,129,0.3)',
             animation: 'fadeIn 0.3s ease'
           }}>
-            ✅ Данные успешно сохранены
+            Данные успешно сохранены
           </div>
         )}
 
@@ -234,7 +234,7 @@ const ProfilePage: React.FC = () => {
                     cursor: 'pointer', fontSize: '15px', fontWeight: '600',
                     boxShadow: '0 4px 15px rgba(102,126,234,0.4)'
                   }}>
-                    💾 Сохранить
+                    Сохранить
                   </button>
                   <button type="button" onClick={handleCancel} style={{
                     padding: '12px 28px',
@@ -278,14 +278,14 @@ const ProfilePage: React.FC = () => {
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
         }}>
           <h3 style={{ margin: '0 0 20px', color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700' }}>
-            📊 Статистика
+            Статистика
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
             {[
-              { value: stats.messages, label: 'Сообщений', color: '#667eea', icon: '💬' },
-              { value: stats.chats, label: 'Активных чатов', color: '#10b981', icon: '🗂️' },
-              { value: stats.days, label: 'Дней активности', color: '#f59e0b', icon: '📅' },
-              { value: `${stats.activity}%`, label: 'Вовлечённость', color: '#ef4444', icon: '🔥' },
+              { value: stats.messages, label: 'Сообщений', color: '#667eea' },
+              { value: stats.chats, label: 'Активных чатов', color: '#10b981' },
+              { value: stats.days, label: 'Дней активности', color: '#f59e0b' },
+              { value: `${stats.activity}%`, label: 'Вовлечённость', color: '#ef4444' },
             ].map(s => (
               <div key={s.label} style={{
                 background: 'var(--bg-secondary)',
@@ -297,7 +297,6 @@ const ProfilePage: React.FC = () => {
                 position: 'relative',
                 overflow: 'hidden'
               }}>
-                <div style={{ fontSize: '28px', marginBottom: '4px' }}>{s.icon}</div>
                 <div style={{ fontSize: '28px', fontWeight: '800', color: s.color, lineHeight: 1 }}>
                   {s.value}
                 </div>
@@ -314,7 +313,7 @@ const ProfilePage: React.FC = () => {
               fontSize: '13px', color: 'var(--text-secondary)',
               display: 'flex', alignItems: 'center', gap: '8px'
             }}>
-              📥 Архивировано чатов: <strong>{stats.archived}</strong>
+              Архивировано чатов: <strong>{stats.archived}</strong>
             </div>
           )}
         </div>
