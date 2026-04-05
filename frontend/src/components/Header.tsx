@@ -56,7 +56,6 @@ const Header: React.FC = () => {
     { to: '/chat', icon: '💬', text: 'Чат', badge: totalUnread > 0 ? totalUnread : undefined },
     { to: '/employees', icon: '👥', text: 'Сотрудники' },
     { to: '/help', icon: '❓', text: 'Помощь' },
-    { to: '/profile', icon: '👤', text: 'Кабинет' },
   ];
 
   return (
@@ -316,7 +315,7 @@ const Header: React.FC = () => {
       </div>
 
       <style>{`
-        input::placeholder { color: rgba(255, 255, 255, 0.6); }
+        header input::placeholder { color: rgba(255, 255, 255, 0.6); }
       `}</style>
     </header>
   );
