@@ -305,7 +305,7 @@ const TasksPage: React.FC = () => {
     }}>
       <div>
         <h1 style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px', letterSpacing: '-0.5px' }}>
-          ✅ Задачи
+          Задачи
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
           {view === 'my' ? 'Выберите исполнителя, чтобы увидеть его задачи' : `Входящие заявки назначенные вам — ${inboxTasks.length}`}
@@ -324,7 +324,7 @@ const TasksPage: React.FC = () => {
               boxShadow: view === 'my' ? '0 2px 8px rgba(102,126,234,0.35)' : 'none',
             }}
           >
-            {isMobile ? '📋' : '📋 Мои заявки'}
+            {isMobile ? 'Мои' : 'Мои заявки'}
           </button>
           <button
             onClick={() => switchView('inbox')}
@@ -336,7 +336,7 @@ const TasksPage: React.FC = () => {
               boxShadow: view === 'inbox' ? '0 2px 8px rgba(17,153,142,0.35)' : 'none',
             }}
           >
-            {isMobile ? '📥' : '📥 Входящие'}
+            {isMobile ? 'Вход.' : 'Входящие'}
             {inboxTasks.length > 0 && (
               <span style={{ position: 'absolute', top: '4px', right: '4px', background: '#ef4444', color: 'white', borderRadius: '10px', padding: '1px 5px', fontSize: '10px', fontWeight: '800', minWidth: '16px', textAlign: 'center', lineHeight: '14px' }}>{inboxTasks.length}</span>
             )}
@@ -356,7 +356,7 @@ const TasksPage: React.FC = () => {
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
         >
-          <span>📝</span> {isMobile ? '' : 'Создать заявку'}
+          {isMobile ? '+' : 'Создать заявку'}
         </button>
       </div>
     </div>
@@ -947,7 +947,7 @@ const RequestModal: React.FC<{
           <>
             <div style={{ padding: '18px 22px 16px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '20px 20px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: 'white' }}>📝 Новая заявка</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: 'white' }}>Новая заявка</div>
                 <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.75)', marginTop: '2px' }}>Создайте задачу и назначьте исполнителя</div>
               </div>
               <button onMouseDown={e => e.preventDefault()} onClick={onClose} style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: 'white', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
@@ -1092,7 +1092,7 @@ const RequestModal: React.FC<{
 
               <div style={{ display: 'flex', gap: '10px', paddingTop: '4px' }}>
                 <button onClick={onClose} style={{ flex: 1, padding: '11px', border: '1.5px solid var(--border-color)', borderRadius: '10px', background: 'transparent', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Отмена</button>
-                <button onClick={handleSubmit} style={{ flex: 2, padding: '11px', border: 'none', borderRadius: '10px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', fontSize: '14px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(102,126,234,0.35)' }}>✅ Отправить заявку</button>
+                <button onClick={handleSubmit} style={{ flex: 2, padding: '11px', border: 'none', borderRadius: '10px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', fontSize: '14px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(102,126,234,0.35)' }}>Отправить заявку</button>
               </div>
             </div>
           </>
