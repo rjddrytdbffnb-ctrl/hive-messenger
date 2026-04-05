@@ -93,7 +93,7 @@ const NotificationsPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '32px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
-              🔔 Уведомления
+              Уведомления
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
               {loading ? 'Загрузка...' : unreadCount > 0 ? `${unreadCount} непрочитанных` : 'Все прочитано'}
