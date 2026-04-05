@@ -61,7 +61,7 @@ const ChatList: React.FC = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
           <h3 style={{ margin: 0, color: 'white', fontSize: '20px', fontWeight: '700' }}>
-            💬 Чаты
+            Чаты
             {totalUnread > 0 && (
               <span style={{
                 marginLeft: '8px', background: '#e74c3c', color: 'white',
@@ -104,10 +104,10 @@ const ChatList: React.FC = () => {
         borderBottom: '1px solid var(--border-color)', overflowX: 'auto'
       }}>
         {[
-          { key: 'all', label: 'Все', icon: '💬' },
-          { key: 'unread', label: 'Непрочит.', icon: '🔴' },
-          { key: 'groups', label: 'Группы', icon: '👥' },
-          { key: 'archived', label: 'Архив', icon: '📥' }
+          { key: 'all', label: 'Все', icon: '●' },
+          { key: 'unread', label: 'Непрочит.', icon: '●' },
+          { key: 'groups', label: 'Группы', icon: '●' },
+          { key: 'archived', label: 'Архив', icon: '●' }
         ].map(f => (
           <button
             key={f.key}
@@ -119,7 +119,7 @@ const ChatList: React.FC = () => {
               fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap',
               transition: 'all 0.2s'
             }}
-          >{f.icon} {f.label}</button>
+          >{f.label}</button>
         ))}
       </div>
 
@@ -277,6 +277,19 @@ const ContextMenuPopup: React.FC<{
           }}
         />
         <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+        {chat.type === 'group' && (
+          <CtxMenuItem
+            icon="🚪"
+            text="Покинуть группу"
+            onClick={() => {
+              if (window.confirm('Покинуть группу?')) {
+                deleteChat(chat.id);
+              }
+              onClose();
+            }}
+            danger
+          />
+        )}
         <CtxMenuItem
           icon="🗑️"
           text="Удалить чат"
