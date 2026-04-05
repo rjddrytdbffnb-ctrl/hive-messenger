@@ -202,7 +202,7 @@ const SettingsPage: React.FC = () => {
                   marginBottom: '24px',
                   color: 'var(--text-primary)'
                 }}>
-                  🔔 Уведомления
+                  Уведомления
                 </h2>
 
                 <SettingRow
@@ -389,7 +389,7 @@ const SettingsPage: React.FC = () => {
                 setTimeout(() => setSaved(false), 2000);
               }}
             >
-              {saved ? '✅ Сохранено!' : '💾 Сохранить изменения'}
+              {saved ? 'Сохранено!' : 'Сохранить изменения'}
             </button>
           </div>
         </div>
