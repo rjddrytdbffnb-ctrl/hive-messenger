@@ -98,7 +98,7 @@ const FileAttachment: React.FC<{ file: any; isMyMessage: boolean }> = ({ file, i
 };
 
 const MessageList: React.FC = () => {
-  const { activeChat, messages, messagesError, setReplyingTo, replyingTo } = useChat();
+  const { activeChat, messages, messagesError, setReplyingTo, replyingTo, deleteChat } = useChat();
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
@@ -228,12 +228,24 @@ const MessageList: React.FC = () => {
           </div>
         </div>
         {activeChat.type === 'group' && (
-          <button
-            onClick={() => setShowAddMember(true)}
-            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', flexShrink: 0 }}
-          >
-            ➕ Добавить
-          </button>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              onClick={() => setShowAddMember(true)}
+              style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+            >
+              + Добавить
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Покинуть группу?')) {
+                  deleteChat(activeChat.id);
+                }
+              }}
+              style={{ background: 'rgba(239,68,68,0.3)', border: 'none', color: 'white', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+            >
+              Покинуть
+            </button>
+          </div>
         )}
       </div>
 
