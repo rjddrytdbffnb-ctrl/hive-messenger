@@ -243,7 +243,7 @@ const EmployeesPage: React.FC = () => {
                 color: 'var(--text-secondary)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>🏢</span>
+                  
                   <span>{employee.department}</span>
                 </div>
               </div>
@@ -448,7 +448,7 @@ const EmployeesPage: React.FC = () => {
             boxShadow: 'var(--shadow-md)',
             flexWrap: 'wrap'
           }}>
-            <span style={{ fontSize: 'clamp(20px, 3vw, 24px)' }}>🏢</span>
+            
             <span style={{ flex: '1 1 auto' }}>{deptName}</span>
             <span style={{
               fontSize: 'clamp(12px, 1.6vw, 14px)',
@@ -787,7 +787,7 @@ const EmployeesPage: React.FC = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            📋 Карточки
+            Карточки
           </button>
 
           <button
@@ -807,7 +807,7 @@ const EmployeesPage: React.FC = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            📱 Лента
+            Лента
           </button>
 
           <button
@@ -827,7 +827,7 @@ const EmployeesPage: React.FC = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            🌳 Древо
+            Древо
           </button>
         </div>
 
@@ -1008,7 +1008,7 @@ const EditEmployeeModal: React.FC<{
             <button onClick={onClose} style={{ flex: 1, padding: '11px', border: '1.5px solid var(--border-color)', borderRadius: '10px', background: 'transparent', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Отмена</button>
             <button onClick={() => onSave({ ...employee, firstName, lastName, email, department, position, role, avatar: newAvatar })}
               style={{ flex: 2, padding: '11px', border: 'none', borderRadius: '10px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white', fontSize: '14px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(102,126,234,0.35)' }}>
-              💾 Сохранить изменения
+              Сохранить изменения
             </button>
           </div>
         </div>
