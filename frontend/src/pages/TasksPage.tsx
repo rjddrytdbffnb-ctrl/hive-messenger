@@ -933,7 +933,7 @@ const RequestModal: React.FC<{
         />
       )}
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, backdropFilter: 'blur(6px)' }} />
-      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--bg-primary)', borderRadius: '20px', zIndex: 1001, maxWidth: '520px', width: '92%', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.3)', border: '1px solid var(--border-color)' }}>
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--bg-primary)', borderRadius: '20px', zIndex: 1001, maxWidth: '640px', width: '94%', maxHeight: '94vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.3)', border: '1px solid var(--border-color)' }}>
         {submitted ? (
           <div style={{ textAlign: 'center', padding: '52px 32px' }}>
             <div style={{ fontSize: '56px', marginBottom: '16px' }}>✅</div>
@@ -953,7 +953,7 @@ const RequestModal: React.FC<{
               <button onMouseDown={e => e.preventDefault()} onClick={onClose} style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: 'white', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
 
-            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 {lbl('Исполнитель *')}
                 {/* Фильтр по отделам в модалке — всегда виден */}
