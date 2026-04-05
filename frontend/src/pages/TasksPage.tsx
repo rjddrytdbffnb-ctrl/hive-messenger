@@ -914,7 +914,7 @@ const RequestModal: React.FC<{
   };
 
   const fieldStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 13px', border: '1.5px solid var(--border-color)', borderRadius: '9px',
+    width: '100%', padding: '9px 12px', border: '1.5px solid var(--border-color)', borderRadius: '9px',
     fontSize: '14px', outline: 'none', boxSizing: 'border-box',
     background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontFamily: 'inherit', transition: 'border-color 0.2s'
   };
@@ -953,7 +953,7 @@ const RequestModal: React.FC<{
               <button onMouseDown={e => e.preventDefault()} onClick={onClose} style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: 'white', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
 
-            <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 {lbl('Исполнитель *')}
                 {/* Фильтр по отделам в модалке — всегда виден */}
@@ -990,7 +990,7 @@ const RequestModal: React.FC<{
                     const activeCount = getActiveTaskCount(e.id);
                     const isSelected = executorId === e.id;
                     return (
-                      <div key={e.id} onClick={() => { setExecutorId(e.id); setErrors(p => ({...p, executor: ''})); }} style={{ padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', background: isSelected ? 'rgba(102,126,234,0.1)' : 'var(--bg-secondary)', border: isSelected ? '2px solid #667eea' : '1.5px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '9px', transition: 'all 0.15s', position: 'relative' }}>
+                      <div key={e.id} onClick={() => { setExecutorId(e.id); setErrors(p => ({...p, executor: ''})); }} style={{ padding: '8px 10px', borderRadius: '10px', cursor: 'pointer', background: isSelected ? 'rgba(102,126,234,0.1)' : 'var(--bg-secondary)', border: isSelected ? '2px solid #667eea' : '1.5px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.15s', position: 'relative' }}>
                         <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: isSelected ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'var(--bg-primary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isSelected ? 'white' : 'var(--text-secondary)', fontSize: '11px', fontWeight: '800', flexShrink: 0 }}>{e.avatar}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
@@ -1042,7 +1042,7 @@ const RequestModal: React.FC<{
               <div>
                 {lbl('Описание')}
                 <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Подробно опишите задачу..."
-                  style={{ ...fieldStyle, minHeight: '90px', resize: 'vertical' }}
+                  style={{ ...fieldStyle, minHeight: '70px', resize: 'vertical' }}
                   onFocus={e => { e.currentTarget.style.borderColor = '#667eea'; }}
                   onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; }}
                 />
@@ -1050,16 +1050,18 @@ const RequestModal: React.FC<{
 
               <div>
                 {lbl('Прикрепить файлы')}
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', border: '1.5px dashed #667eea', borderRadius: '9px', background: 'rgba(102,126,234,0.04)', color: '#667eea', fontSize: '13px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(102,126,234,0.09)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(102,126,234,0.04)'; }}
-                >
-                  📎 Прикрепить файл
-                  <input type="file" multiple onChange={handleFileChange} style={{ display: 'none' }} />
-                </label>
-                <button type="button" onClick={() => setShowGallery(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', border: '1.5px dashed #764ba2', borderRadius: '9px', background: 'rgba(118,75,162,0.04)', color: '#764ba2', fontSize: '13px', fontWeight: '600', cursor: 'pointer', width: '100%', marginTop: '8px' }}>
-                  🗂️ Из галереи
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px', border: '1.5px dashed #667eea', borderRadius: '9px', background: 'rgba(102,126,234,0.04)', color: '#667eea', fontSize: '12px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(102,126,234,0.09)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(102,126,234,0.04)'; }}
+                  >
+                    📎 Файл
+                    <input type="file" multiple onChange={handleFileChange} style={{ display: 'none' }} />
+                  </label>
+                  <button type="button" onClick={() => setShowGallery(true)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px', border: '1.5px dashed #764ba2', borderRadius: '9px', background: 'rgba(118,75,162,0.04)', color: '#764ba2', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                    🗂️ Галерея
+                  </button>
+                </div>
                 {galleryFiles.length > 0 && (
                   <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     {galleryFiles.map((file, idx) => (
