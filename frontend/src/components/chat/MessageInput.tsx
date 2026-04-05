@@ -161,7 +161,7 @@ const MessageInput: React.FC = () => {
       style={{
         background: 'var(--bg-primary)',
         borderTop: `2px solid ${isDragging ? '#667eea' : 'var(--border-color)'}`,
-        padding: '12px 20px 16px',
+        padding: '8px 16px 10px',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
@@ -238,11 +238,14 @@ const MessageInput: React.FC = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
 
-        <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignSelf: 'flex-end', paddingBottom: '4px' }}>
-          <ActionButton icon="📎" tooltip="Прикрепить файл" onClick={() => fileInputRef.current?.click()} />
-          <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
+        <div style={{ display: 'flex', gap: '2px', flexShrink: 0, alignSelf: 'flex-end', paddingBottom: '4px' }}>
+          {/* Кнопка прикрепления — раскрывает файл/галерею */}
+          <div style={{ position: 'relative' }}>
+            <ActionButton icon="📎" tooltip="Прикрепить" onClick={() => fileInputRef.current?.click()} />
+            <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
+          </div>
           <ActionButton icon="🗂️" tooltip="Из галереи" onClick={() => setShowGallery(true)} />
 
           {/* ЭМОДЗИ */}
@@ -304,7 +307,7 @@ const MessageInput: React.FC = () => {
             placeholder="Введите сообщение... (@ для упоминания)"
             style={{
               width: '100%',
-              minHeight: '48px',
+              minHeight: '42px',
               maxHeight: '150px',
             }}
           />
@@ -320,7 +323,7 @@ const MessageInput: React.FC = () => {
         </div>
 
         <button type="submit" disabled={!text.trim() && attachedFiles.length === 0} style={{
-          width: '48px', height: '48px', borderRadius: '50%', border: 'none',
+          width: '42px', height: '42px', borderRadius: '50%', border: 'none',
           background: (text.trim() || attachedFiles.length > 0)
             ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
             : 'var(--bg-secondary)',
@@ -336,11 +339,6 @@ const MessageInput: React.FC = () => {
         >➤</button>
       </form>
 
-      {isTyping && (
-        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic', paddingLeft: '4px' }}>
-          Вы печатаете...
-        </div>
-      )}
     </div>
     </>
   );
@@ -356,7 +354,7 @@ const ActionButton: React.FC<{
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
-          width: '36px', height: '36px', border: 'none',
+          width: '32px', height: '32px', border: 'none',
           backgroundColor: active ? 'rgba(102,126,234,0.15)' : isHovered ? 'var(--bg-hover)' : 'transparent',
           borderRadius: '8px', cursor: 'pointer',
           fontSize: isText ? '12px' : '18px',
