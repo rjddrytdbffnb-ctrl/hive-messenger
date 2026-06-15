@@ -31,9 +31,7 @@ api.interceptors.response.use(
   }
 );
 
-// ============================================================
-// AUTH API
-// ============================================================
+
 export const authAPI = {
   login: (data: LoginData) =>
     api.post<AuthResponse>('/api/auth/login', data),
@@ -45,9 +43,7 @@ export const authAPI = {
     api.get<{ user: User }>('/api/users/me'),
 };
 
-// ============================================================
-// USERS API
-// ============================================================
+
 export const usersAPI = {
   getAll: () =>
     api.get<{ users: User[] }>('/api/users'),
@@ -60,9 +56,7 @@ export const usersAPI = {
     }),
 };
 
-// ============================================================
-// CHATS API
-// ============================================================
+
 export const chatsAPI = {
   getAll: () =>
     api.get<{ chats: any[] }>('/api/chats'),
@@ -89,9 +83,7 @@ export const chatsAPI = {
     api.get(`/api/chats/${chatId}/search`, { params: { query } }),
 };
 
-// ============================================================
-// MESSAGES API
-// ============================================================
+
 export const messagesAPI = {
   getByChat: (chatId: string, page = 1, limit = 50) =>
     api.get<{ messages: any[] }>(`/api/chats/${chatId}/messages`, {
@@ -114,9 +106,7 @@ export const messagesAPI = {
     api.get(`/api/messages/${messageId}/reactions`),
 };
 
-// ============================================================
-// NOTIFICATIONS API
-// ============================================================
+
 export const notificationsAPI = {
   getAll: () =>
     api.get<{ notifications: any[] }>('/api/notifications'),
@@ -128,9 +118,7 @@ export const notificationsAPI = {
     api.put('/api/notifications/read-all'),
 };
 
-// ============================================================
-// TASKS API
-// ============================================================
+
 export const tasksAPI = {
   getAll: () =>
     api.get<{ tasks: any[] }>('/api/tasks'),
