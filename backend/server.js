@@ -56,9 +56,7 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// ============================================================
-// DEBUG
-// ============================================================
+
 app.get('/api/debug/db', async (req, res) => {
   try {
     const time   = await pool.query('SELECT NOW() as t');
@@ -75,9 +73,7 @@ app.get('/api/debug/db', async (req, res) => {
   }
 });
 
-// ============================================================
-// AUTH
-// ============================================================
+
 
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -151,9 +147,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// ============================================================
-// USERS
-// ============================================================
+
 
 app.get('/api/users/me', authenticateToken, (req, res) => {
   res.json({ user: req.user });
@@ -216,9 +210,7 @@ app.put('/api/users/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// CHATS
-// ============================================================
+
 
 // Все чаты текущего пользователя
 app.get('/api/chats', authenticateToken, async (req, res) => {
@@ -443,9 +435,7 @@ app.delete('/api/chats/:chatId/members/:userId', authenticateToken, async (req, 
   }
 });
 
-// ============================================================
-// MESSAGES — используем sender_id (по схеме БД!)
-// ============================================================
+
 
 app.get('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
   try {
@@ -566,9 +556,6 @@ app.post('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
 
 
 
-// ============================================================
-// УДАЛЕНИЕ СООБЩЕНИЯ
-// ============================================================
 app.delete('/api/messages/:messageId', authenticateToken, async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -591,9 +578,7 @@ app.delete('/api/messages/:messageId', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// РЕДАКТИРОВАНИЕ СООБЩЕНИЯ
-// ============================================================
+
 app.put('/api/messages/:messageId', authenticateToken, async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -622,9 +607,7 @@ app.put('/api/messages/:messageId', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// UPLOAD — загрузка файлов с сообщением
-// ============================================================
+
 
 app.post('/api/chats/:chatId/messages/upload', authenticateToken, upload.array('files', 10), async (req, res) => {
   try {
@@ -699,9 +682,7 @@ app.post('/api/chats/:chatId/messages/upload', authenticateToken, upload.array('
   }
 });
 
-// ============================================================
-// TASKS
-// ============================================================
+
 
 app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
@@ -773,9 +754,7 @@ app.delete('/api/tasks/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// TASK COMMENTS
-// ============================================================
+
 
 app.get('/api/tasks/:id/comments', authenticateToken, async (req, res) => {
   try {
@@ -817,9 +796,7 @@ app.post('/api/tasks/:id/comments', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// TASK FILES  
-// ============================================================
+
 
 app.get('/api/tasks/:id/files', authenticateToken, async (req, res) => {
   try {
@@ -850,9 +827,6 @@ app.delete('/api/tasks/:taskId/files/:fileId', authenticateToken, async (req, re
   }
 });
 
-// ============================================================
-// MEDIA GALLERY
-// ============================================================
 
 app.post('/api/media', authenticateToken, upload.single('file'), async (req, res) => {
   try {
@@ -930,9 +904,6 @@ app.delete('/api/media/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// NOTIFICATIONS
-// ============================================================
 
 app.get('/api/notifications', authenticateToken, async (req, res) => {
   try {
@@ -968,9 +939,7 @@ app.put('/api/notifications/:id/read', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// ЗАПУСК
-// ============================================================
+
 async function start() {
   try {
     await runMigrations();
